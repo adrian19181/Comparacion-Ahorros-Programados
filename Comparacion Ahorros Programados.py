@@ -158,16 +158,16 @@ if all(wb is not None for wb in wbs.values()):
         }
 
     # ==============================================================================
-    # ESTILOS CSS CON PRIMERA COLUMNA FIJA (STICKY COLUMN)
+    # ESTILOS CSS REFINADOS: COLUMNA FIJA FLUSH, ANCHO AUTO Y DATOS CENTRADOS
     # ==============================================================================
     css_tablas = """<style>
 .excel-tbl-card {
     background-color: #ffffff;
-    padding: 12px;
+    padding: 0px; /* Elimina fugas de texto al desplazar la columna sticky */
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    display: inline-block;
-    margin-bottom: 20px;
+    display: block;
+    margin-bottom: 25px;
     max-width: 100%;
     overflow-x: auto;
     border: 1px solid #000000;
@@ -178,45 +178,47 @@ if all(wb is not None for wb in wbs.values()):
     font-family: Calibri, 'Segoe UI', Arial, sans-serif;
     font-size: 13px;
     color: #000000;
-    width: auto;
-    min-width: 480px;
+    width: 100%;
+    margin: 0;
 }
 .excel-tbl th {
     background-color: #1F2937;
     color: #ffffff;
     border-right: 1px solid #000000;
     border-bottom: 1px solid #000000;
-    border-top: 1px solid #000000;
-    padding: 6px 16px;
-    text-align: center;
+    padding: 8px 12px;
+    text-align: center; /* Encabezados centrados */
     font-weight: bold;
     font-size: 14px;
+    white-space: nowrap;
 }
 .excel-tbl th:first-child {
     position: sticky;
     left: 0;
-    z-index: 5;
+    z-index: 10;
     background-color: #1F2937;
-    border-left: 1px solid #000000;
-    text-align: right;
+    text-align: center; /* Título de la primera columna centrado */
+    white-space: nowrap;
+    width: 1%; /* Ajusta el ancho al texto más largo */
 }
 .excel-tbl td {
     border-right: 1px solid #000000;
     border-bottom: 1px solid #000000;
-    padding: 6px 14px;
+    padding: 8px 12px;
     vertical-align: middle;
+    text-align: center; /* Datos centrados */
+    white-space: nowrap;
 }
 .lbl-yellow {
     position: sticky;
     left: 0;
-    z-index: 2;
+    z-index: 5;
     background-color: #FFE600 !important;
     font-weight: bold;
-    text-align: right;
-    white-space: nowrap;
+    text-align: center; /* Títulos de filas centrados */
+    white-space: nowrap; /* Ajusta automáticamente al texto más ancho sin saltos forzados */
     line-height: 1.25;
-    border-left: 1px solid #000000;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.15);
+    width: 1%; /* Mantiene el ancho ceñido al contenido */
 }
 .val-green {
     background-color: #E2EFDA;
@@ -317,31 +319,31 @@ if all(wb is not None for wb in wbs.values()):
 </thead>
 <tbody>
 <tr>
-<td class="lbl-yellow">Total Interés<br>Ganados</td>
+<td class="lbl-yellow">Total Interés Ganados</td>
 <td class="val-green">{datos["2024"]["int_ganados"]}</td>
 <td class="val-green">{datos["2025"]["int_ganados"]}</td>
 <td class="val-green">{datos["2026"]["int_ganados"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Total Depósitos<br>Mensuales</td>
+<td class="lbl-yellow">Total Depósitos Mensuales</td>
 <td class="val-blue">{datos["2024"]["dep_mensuales"]}</td>
 <td class="val-blue">{datos["2025"]["dep_mensuales"]}</td>
 <td class="val-blue">{datos["2026"]["dep_mensuales"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Total Depósitos<br>Personales</td>
+<td class="lbl-yellow">Total Depósitos Personales</td>
 <td class="val-tan">{datos["2024"]["dep_personales"]}</td>
 <td class="val-tan">{datos["2025"]["dep_personales"]}</td>
 <td class="val-tan">{datos["2026"]["dep_personales"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Total Depositado<br>sin Intereses</td>
+<td class="lbl-yellow">Total Depositado sin Intereses</td>
 <td class="val-blue">{datos["2024"]["dep_sin_int"]}</td>
 <td class="val-blue">{datos["2025"]["dep_sin_int"]}</td>
 <td class="val-blue">{datos["2026"]["dep_sin_int"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Total Ganado<br>Incluido Intereses</td>
+<td class="lbl-yellow">Total Ganado Incluido Intereses</td>
 <td class="val-green">{datos["2024"]["total_ganado"]}</td>
 <td class="val-green">{datos["2025"]["total_ganado"]}</td>
 <td class="val-green">{datos["2026"]["total_ganado"]}</td>
@@ -371,49 +373,49 @@ if all(wb is not None for wb in wbs.values()):
 </thead>
 <tbody>
 <tr>
-<td class="lbl-yellow">TIR (Tasa Interna<br>de Retorno)</td>
+<td class="lbl-yellow">TIR (Tasa Interna de Retorno)</td>
 <td class="val-purple">{datos["2024"]["tir"]}</td>
 <td class="val-purple">{datos["2025"]["tir"]}</td>
 <td class="val-purple">{datos["2026"]["tir"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">TEA (Tasa Efectiva<br>Anual)</td>
+<td class="lbl-yellow">TEA (Tasa Efectiva Anual)</td>
 <td class="val-purple">{datos["2024"]["tea"]}</td>
 <td class="val-purple">{datos["2025"]["tea"]}</td>
 <td class="val-purple">{datos["2026"]["tea"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">ROI (Rentabilidad<br>Acumulada)</td>
+<td class="lbl-yellow">ROI (Rentabilidad Acumulada)</td>
 <td class="val-green">{datos["2024"]["roi"]}</td>
 <td class="val-green">{datos["2025"]["roi"]}</td>
 <td class="val-green">{datos["2026"]["roi"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Ratio de<br>Ganancia</td>
+<td class="lbl-yellow">Ratio de Ganancia</td>
 <td class="val-purple">{datos["2024"]["ratio_ganancia"]}</td>
 <td class="val-purple">{datos["2025"]["ratio_ganancia"]}</td>
 <td class="val-purple">{datos["2026"]["ratio_ganancia"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Interés Mensual<br>Ponderado</td>
+<td class="lbl-yellow">Interés Mensual Ponderado</td>
 <td class="val-purple">{datos["2024"]["int_mensual_pond"]}</td>
 <td class="val-purple">{datos["2025"]["int_mensual_pond"]}</td>
 <td class="val-purple">{datos["2026"]["int_mensual_pond"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Saldo Fin de Mes<br>Promedio Ponderado</td>
+<td class="lbl-yellow">Saldo Fin de Mes Promedio Ponderado</td>
 <td class="val-blue">{datos["2024"]["saldo_prom_pond"]}</td>
 <td class="val-blue">{datos["2025"]["saldo_prom_pond"]}</td>
 <td class="val-blue">{datos["2026"]["saldo_prom_pond"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Aportes Personales<br>Promedio</td>
+<td class="lbl-yellow">Aportes Personales Promedio</td>
 <td class="val-tan">{datos["2024"]["aportes_prom"]}</td>
 <td class="val-tan">{datos["2025"]["aportes_prom"]}</td>
 <td class="val-tan">{datos["2026"]["aportes_prom"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Interés Diario<br>Promedio</td>
+<td class="lbl-yellow">Interés Diario Promedio</td>
 <td class="val-green">{datos["2024"]["int_diario_prom"]}</td>
 <td class="val-green">{datos["2025"]["int_diario_prom"]}</td>
 <td class="val-green">{datos["2026"]["int_diario_prom"]}</td>
