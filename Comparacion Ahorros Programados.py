@@ -158,12 +158,12 @@ if all(wb is not None for wb in wbs.values()):
         }
 
     # ==============================================================================
-    # ESTILOS CSS REFINADOS: COLUMNA FIJA FLUSH, ANCHO AUTO Y DATOS CENTRADOS
+    # ESTILOS CSS REUTILIZABLES COMPACTOS Y ADAPTATIVOS A MÓVIL
     # ==============================================================================
     css_tablas = """<style>
 .excel-tbl-card {
     background-color: #ffffff;
-    padding: 0px; /* Elimina fugas de texto al desplazar la columna sticky */
+    padding: 0px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     display: block;
@@ -176,7 +176,7 @@ if all(wb is not None for wb in wbs.values()):
     border-collapse: separate;
     border-spacing: 0;
     font-family: Calibri, 'Segoe UI', Arial, sans-serif;
-    font-size: 13px;
+    font-size: 12px;
     color: #000000;
     width: 100%;
     margin: 0;
@@ -186,28 +186,33 @@ if all(wb is not None for wb in wbs.values()):
     color: #ffffff;
     border-right: 1px solid #000000;
     border-bottom: 1px solid #000000;
-    padding: 8px 12px;
-    text-align: center; /* Encabezados centrados */
+    padding: 6px 8px;
+    text-align: center;
     font-weight: bold;
-    font-size: 14px;
+    font-size: 13px;
     white-space: nowrap;
+    min-width: 90px;
 }
 .excel-tbl th:first-child {
     position: sticky;
     left: 0;
     z-index: 10;
     background-color: #1F2937;
-    text-align: center; /* Título de la primera columna centrado */
-    white-space: nowrap;
-    width: 1%; /* Ajusta el ancho al texto más largo */
+    text-align: center;
+    white-space: normal;
+    width: 125px;
+    min-width: 125px;
+    max-width: 125px;
+    font-size: 12px;
 }
 .excel-tbl td {
     border-right: 1px solid #000000;
     border-bottom: 1px solid #000000;
-    padding: 8px 12px;
+    padding: 6px 8px;
     vertical-align: middle;
-    text-align: center; /* Datos centrados */
+    text-align: center;
     white-space: nowrap;
+    min-width: 90px;
 }
 .lbl-yellow {
     position: sticky;
@@ -215,10 +220,15 @@ if all(wb is not None for wb in wbs.values()):
     z-index: 5;
     background-color: #FFE600 !important;
     font-weight: bold;
-    text-align: center; /* Títulos de filas centrados */
-    white-space: nowrap; /* Ajusta automáticamente al texto más ancho sin saltos forzados */
-    line-height: 1.25;
-    width: 1%; /* Mantiene el ancho ceñido al contenido */
+    text-align: center;
+    white-space: normal !important;
+    word-wrap: break-word;
+    line-height: 1.2;
+    width: 125px;
+    min-width: 125px;
+    max-width: 125px;
+    font-size: 11px;
+    padding: 6px 4px !important;
 }
 .val-green {
     background-color: #E2EFDA;
