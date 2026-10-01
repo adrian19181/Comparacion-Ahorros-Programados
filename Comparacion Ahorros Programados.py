@@ -119,7 +119,7 @@ if all(wb is not None for wb in wbs.values()):
     for year, wb in wbs.items():
         sheet = wb.active
         
-        # Extracción y cálculos de parámetros no presentes directamente
+        # Extracción y cálculos de parámetros
         tna_raw = obtener_valor(sheet, "F1", "H1")
         tna_num = float(tna_raw) if isinstance(tna_raw, (int, float)) else 0.065
         tna_dec = tna_num if tna_num <= 1 else tna_num / 100.0
@@ -146,7 +146,7 @@ if all(wb is not None for wb in wbs.values()):
             "dep_sin_int": fmt_moneda(sheet["D5"].value),
             "total_ganado": fmt_moneda(d6_raw),
             
-            # Sección 3: Rendimientos (incluye TEA y Ratio de Ganancia calculados)
+            # Sección 3: Rendimientos
             "tir": fmt_porcentaje(sheet["B7"].value),
             "tea": fmt_porcentaje(tea_calc),
             "roi": fmt_porcentaje(sheet["D7"].value),
@@ -158,7 +158,7 @@ if all(wb is not None for wb in wbs.values()):
         }
 
     # ==============================================================================
-    # ESTILOS CSS REUTILIZABLES ESTILO EXCEL
+    # ESTILOS CSS CON PRIMERA COLUMNA FIJA (STICKY COLUMN)
     # ==============================================================================
     css_tablas = """<style>
 .excel-tbl-card {
@@ -170,35 +170,53 @@ if all(wb is not None for wb in wbs.values()):
     margin-bottom: 20px;
     max-width: 100%;
     overflow-x: auto;
+    border: 1px solid #000000;
 }
 .excel-tbl {
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-family: Calibri, 'Segoe UI', Arial, sans-serif;
     font-size: 13px;
     color: #000000;
     width: auto;
-    min-width: 520px;
+    min-width: 480px;
 }
 .excel-tbl th {
     background-color: #1F2937;
     color: #ffffff;
-    border: 1px solid #000000;
+    border-right: 1px solid #000000;
+    border-bottom: 1px solid #000000;
+    border-top: 1px solid #000000;
     padding: 6px 16px;
     text-align: center;
     font-weight: bold;
     font-size: 14px;
 }
+.excel-tbl th:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background-color: #1F2937;
+    border-left: 1px solid #000000;
+    text-align: right;
+}
 .excel-tbl td {
-    border: 1px solid #000000;
+    border-right: 1px solid #000000;
+    border-bottom: 1px solid #000000;
     padding: 6px 14px;
     vertical-align: middle;
 }
 .lbl-yellow {
-    background-color: #FFE600;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background-color: #FFE600 !important;
     font-weight: bold;
     text-align: right;
     white-space: nowrap;
     line-height: 1.25;
+    border-left: 1px solid #000000;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.15);
 }
 .val-green {
     background-color: #E2EFDA;
