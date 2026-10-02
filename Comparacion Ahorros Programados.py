@@ -496,10 +496,14 @@ if all(wb is not None for wb in wbs.values()):
 
     with tab_tasas:
         fig2 = go.Figure()
-        # Colores completamente distintos para que no se repitan visualmente
-        fig2.add_trace(go.Bar(x=years, y=tna_vals, name="TNA", marker_color="#38BDF8", text=[f"{v:.2f}%" for v in tna_vals], textposition="auto"))
-        fig2.add_trace(go.Bar(x=years, y=tea_vals, name="TEA", marker_color="#F43F5E", text=[f"{v:.2f}%" for v in tea_vals], textposition="auto"))
-        fig2.add_trace(go.Bar(x=years, y=tir_vals, name="TIR", marker_color="#FBBF24", text=[f"{v:.2f}%" for v in tir_vals], textposition="auto"))
+        
+        # Se cambió el color de la TEA a un morado suave (#A855F7) y el texto se puso en 'outside' para evitar que se monte sobre la barra.
+        fig2.add_trace(go.Bar(x=years, y=tna_vals, name="TNA", marker_color="#38BDF8", text=[f"{v:.2f}%" for v in tna_vals], textposition="outside"))
+        fig2.add_trace(go.Bar(x=years, y=tea_vals, name="TEA", marker_color="#A855F7", text=[f"{v:.2f}%" for v in tea_vals], textposition="outside"))
+        fig2.add_trace(go.Bar(x=years, y=tir_vals, name="TIR", marker_color="#FBBF24", text=[f"{v:.2f}%" for v in tir_vals], textposition="outside"))
+        
+        # Aumentamos el rango de Y (hasta un 25% más alto del máximo) para que los textos 'outside' no se corten arriba
+        max_tasa = max(max(tna_vals), max(tea_vals), max(tir_vals)) if tna_vals else 10
         
         fig2.update_layout(
             barmode='group',
@@ -510,16 +514,17 @@ if all(wb is not None for wb in wbs.values()):
             plot_bgcolor="rgba(0,0,0,0)",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             dragmode=False,
-            margin=dict(l=10, r=10, t=50, b=10)
+            margin=dict(l=10, r=10, t=50, b=10),
+            yaxis=dict(range=[0, max_tasa * 1.25])
         )
         fig2.update_xaxes(fixedrange=True)
         fig2.update_yaxes(fixedrange=True)
         st.plotly_chart(fig2, use_container_width=True, config=plotly_config)
 
     with tab_int:
-        # Usamos doble eje Y para que la línea de interés diario (pequeña) no se aplaste contra la mensual
         fig3 = make_subplots(specs=[[{"secondary_y": True}]])
         
+        # Línea de Interés Mensual
         fig3.add_trace(go.Scatter(
             x=years, y=int_mensual_pond, mode='lines+markers+text', name="Int. Mensual", 
             line=dict(color="#00D1B2", width=4),
@@ -529,6 +534,7 @@ if all(wb is not None for wb in wbs.values()):
             textfont=dict(size=13, color="#00D1B2")
         ), secondary_y=False)
 
+        # Línea de Interés Diario
         fig3.add_trace(go.Scatter(
             x=years, y=int_diario_prom, mode='lines+markers+text', name="Int. Diario", 
             line=dict(color="#A855F7", width=4, dash='dot'),
@@ -547,8 +553,15 @@ if all(wb is not None for wb in wbs.values()):
             dragmode=False,
             margin=dict(l=10, r=10, t=50, b=10)
         )
+        
+        # ALTERAMOS LA ESCALA DEL EJE SECUNDARIO: 
+        # Multiplicamos el rango máximo por 2.5 para empujar la línea de interés diario hacia la mitad inferior del gráfico.
+        # De este modo, las líneas ya no colisionan visualmente.
+        max_mensual = max(int_mensual_pond) if int_mensual_pond else 100
+        max_diario = max(int_diario_prom) if int_diario_prom else 10
+        
         fig3.update_xaxes(fixedrange=True, showgrid=False)
-        fig3.update_yaxes(fixedrange=True, secondary_y=False, showgrid=False, range=[0, max(int_mensual_pond) * 1.3])
-        fig3.update_yaxes(fixedrange=True, secondary_y=True, showgrid=False, range=[0, max(int_diario_prom) * 1.3], showticklabels=False)
+        fig3.update_yaxes(fixedrange=True, secondary_y=False, showgrid=False, range=[0, max_mensual * 1.3])
+        fig3.update_yaxes(fixedrange=True, secondary_y=True, showgrid=False, range=[0, max_diario * 2.5], showticklabels=False)
 
         st.plotly_chart(fig3, use_container_width=True, config=plotly_config)
