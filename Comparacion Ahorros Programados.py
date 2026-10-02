@@ -435,3 +435,93 @@ if all(wb is not None for wb in wbs.values()):
 </div>"""
 
     st.markdown(html_rendimientos, unsafe_allow_html=True)
+
+
+    # ==============================================================================
+    # 4. GRÁFICOS DINÁMICOS
+    # ==============================================================================
+    st.divider()
+    st.subheader("📊 Análisis Gráfico de Ahorros")
+
+    import plotly.graph_objects as go
+
+    # Función auxiliar para convertir las cadenas formateadas (ej. "$1.234,50" o "6,50%") de vuelta a números para graficar
+    def str_to_float(val_str):
+        if val_str in ("-", "", None): return 0.0
+        # Quitamos símbolos y normalizamos separadores
+        clean_str = str(val_str).replace("$", "").replace("%", "").replace(".", "").replace(",", ".")
+        try:
+            return float(clean_str)
+        except:
+            return 0.0
+
+    # Extraer arrays para Plotly
+    years = list(datos.keys())
+    
+    cap_depositado = [str_to_float(datos[y]["dep_sin_int"]) for y in years]
+    int_ganado = [str_to_float(datos[y]["int_ganados"]) for y in years]
+    
+    tna_vals = [str_to_float(datos[y]["tna"]) for y in years]
+    tea_vals = [str_to_float(datos[y]["tea"]) for y in years]
+    tir_vals = [str_to_float(datos[y]["tir"]) for y in years]
+    
+    int_mensual_pond = [str_to_float(datos[y]["int_mensual_pond"]) for y in years]
+
+    # Crear Pestañas para organizar los gráficos
+    tab_comp, tab_tasas, tab_int = st.tabs(["💰 Capital vs Intereses", "📉 Comparativa de Tasas", "📈 Interés Mensual Ponderado"])
+    
+    plotly_config = {'displayModeBar': False}
+
+    with tab_comp:
+        fig1 = go.Figure()
+        fig1.add_trace(go.Bar(x=years, y=cap_depositado, name="Capital Depositado", marker_color="#1E3A8A", text=[f"${v:,.0f}" for v in cap_depositado], textposition="inside"))
+        fig1.add_trace(go.Bar(x=years, y=int_ganado, name="Intereses Ganados", marker_color="#10B981", text=[f"${v:,.0f}" for v in int_ganado], textposition="inside"))
+        
+        fig1.update_layout(
+            barmode='stack',
+            title="Composición del Ahorro Final",
+            template="plotly_dark",
+            yaxis_tickprefix="$",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig1, use_container_width=True, config=plotly_config)
+
+    with tab_tasas:
+        fig2 = go.Figure()
+        fig2.add_trace(go.Bar(x=years, y=tna_vals, name="TNA", marker_color="#38BDF8", text=[f"{v:.2f}%" for v in tna_vals], textposition="auto"))
+        fig2.add_trace(go.Bar(x=years, y=tea_vals, name="TEA", marker_color="#A855F7", text=[f"{v:.2f}%" for v in tea_vals], textposition="auto"))
+        fig2.add_trace(go.Bar(x=years, y=tir_vals, name="TIR", marker_color="#00D1B2", text=[f"{v:.2f}%" for v in tir_vals], textposition="auto"))
+        
+        fig2.update_layout(
+            barmode='group',
+            title="Evolución de Tasas de Rendimiento",
+            template="plotly_dark",
+            yaxis_ticksuffix="%",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig2, use_container_width=True, config=plotly_config)
+
+    with tab_int:
+        fig3 = go.Figure()
+        fig3.add_trace(go.Scatter(
+            x=years, y=int_mensual_pond, mode='lines+markers+text', name="Interés Mensual", 
+            line=dict(color="#FBBF24", width=4),
+            marker=dict(size=12, color="#FBBF24"),
+            text=[f"${v:,.2f}" for v in int_mensual_pond], 
+            textposition="top center",
+            textfont=dict(size=13, color="#FFFFFF")
+        ))
+        
+        fig3.update_layout(
+            title="Evolución del Interés Mensual Ponderado",
+            template="plotly_dark",
+            yaxis_tickprefix="$",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(range=[0, max(int_mensual_pond) * 1.3]) # Dar espacio extra para las etiquetas
+        )
+        st.plotly_chart(fig3, use_container_width=True, config=plotly_config)
