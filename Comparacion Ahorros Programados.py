@@ -456,112 +456,95 @@ if all(wb is not None for wb in wbs.values()):
 
     years = list(datos.keys())
     
-    cap_depositado = [str_to_float(datos[y]["dep_sin_int"]) for y in years]
     int_ganado = [str_to_float(datos[y]["int_ganados"]) for y in years]
+    int_mensual_pond = [str_to_float(datos[y]["int_mensual_pond"]) for y in years]
+    saldo_prom_pond = [str_to_float(datos[y]["saldo_prom_pond"]) for y in years]
+    int_diario_prom = [str_to_float(datos[y]["int_diario_prom"]) for y in years]
     
     tna_vals = [str_to_float(datos[y]["tna"]) for y in years]
     tea_vals = [str_to_float(datos[y]["tea"]) for y in years]
     tir_vals = [str_to_float(datos[y]["tir"]) for y in years]
-    
-    int_mensual_pond = [str_to_float(datos[y]["int_mensual_pond"]) for y in years]
-    int_diario_prom = [str_to_float(datos[y]["int_diario_prom"]) for y in years]
 
-    tab_comp, tab_tasas, tab_int = st.tabs(["💰 Capital vs Intereses", "📉 Comparativa de Tasas", "📈 Interés Promedio"])
+    tab_mensual, tab_saldo, tab_diario, tab_acumulado, tab_tasas = st.tabs([
+        "💰 Mensual", "🏦 Saldo", "⏱️ Diario", "📈 Acumulado", "📉 Tasas"
+    ])
     
-    # CONFIGURACIÓN ESTRICTA PARA MÓVIL: Bloquea todo tipo de zoom, paneo y toque en la pantalla
+    # CONFIGURACIÓN ESTRICTA PARA MÓVIL: Bloquea todo tipo de zoom y toques
     plotly_config = {
         'displayModeBar': False,
         'staticPlot': True
     }
 
-    with tab_comp:
-        fig1 = go.Figure()
-        fig1.add_trace(go.Bar(x=years, y=cap_depositado, name="Capital Depositado", marker_color="#1E3A8A", text=[f"${v:,.0f}" for v in cap_depositado], textposition="inside"))
-        fig1.add_trace(go.Bar(x=years, y=int_ganado, name="Intereses Ganados", marker_color="#10B981", text=[f"${v:,.0f}" for v in int_ganado], textposition="inside"))
+    # CREADOR UNIVERSAL DE GRÁFICOS DE BARRAS HORIZONTALES (Resuelve todos los solapamientos)
+    def plot_hbar(x_data, y_labels, color, prefix="$"):
+        fig = go.Figure()
         
-        fig1.update_layout(
-            barmode='stack',
-            title="Composición del Ahorro Final",
+        # Etiquetado en negrita y formateo. 'auto' hace que si no entra adentro de la barra, lo empuje hacia afuera.
+        text_vals = [f"<b>{prefix}{v:,.2f}</b>" if prefix=="$" else f"<b>{v:.2f}{prefix}</b>" for v in x_data]
+        
+        fig.add_trace(go.Bar(
+            y=[f"<b>{y}</b>" for y in y_labels],
+            x=x_data,
+            orientation='h',
+            marker_color=color,
+            text=text_vals,
+            textposition='auto',
+            insidetextanchor='end'  # Asegura que el texto se pegue al extremo derecho de la barra
+        ))
+        
+        fig.update_layout(
             template="plotly_dark",
-            yaxis_tickprefix="$",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin=dict(l=10, r=60, t=10, b=10), # 'r=60' deja un margen derecho extra para los números que salgan de las barras
             dragmode=False,
-            margin=dict(l=10, r=10, t=50, b=10)
+            showlegend=False
         )
-        fig1.update_xaxes(fixedrange=True)
-        fig1.update_yaxes(fixedrange=True)
-        st.plotly_chart(fig1, use_container_width=True, config=plotly_config)
+        fig.update_xaxes(fixedrange=True, visible=False)
+        fig.update_yaxes(fixedrange=True, autorange="reversed", tickfont=dict(size=14, color="white"))
+        
+        return fig
+
+    # Construcción de Pestañas usando Títulos HTML (Previene el colapso con las leyendas)
+    with tab_mensual:
+        st.markdown("<h5 style='text-align: center; color: #00D1B2; margin-bottom: 0;'>Interés Ganado Mensual</h5>", unsafe_allow_html=True)
+        fig_m = plot_hbar(int_mensual_pond, years, "#00D1B2")
+        st.plotly_chart(fig_m, use_container_width=True, config=plotly_config)
+
+    with tab_saldo:
+        st.markdown("<h5 style='text-align: center; color: #3B82F6; margin-bottom: 0;'>Saldo Fin de Mes Promedio</h5>", unsafe_allow_html=True)
+        fig_s = plot_hbar(saldo_prom_pond, years, "#3B82F6")
+        st.plotly_chart(fig_s, use_container_width=True, config=plotly_config)
+        
+    with tab_diario:
+        st.markdown("<h5 style='text-align: center; color: #A855F7; margin-bottom: 0;'>Interés Diario Promedio</h5>", unsafe_allow_html=True)
+        fig_d = plot_hbar(int_diario_prom, years, "#A855F7")
+        st.plotly_chart(fig_d, use_container_width=True, config=plotly_config)
+        
+    with tab_acumulado:
+        st.markdown("<h5 style='text-align: center; color: #10B981; margin-bottom: 0;'>Interés Acumulado Creciente</h5>", unsafe_allow_html=True)
+        fig_a = plot_hbar(int_ganado, years, "#10B981")
+        st.plotly_chart(fig_a, use_container_width=True, config=plotly_config)
 
     with tab_tasas:
-        fig2 = go.Figure()
+        st.markdown("<h5 style='text-align: center; color: #FBBF24; margin-bottom: 0;'>Comparativa de Tasas (TNA, TEA, TIR)</h5>", unsafe_allow_html=True)
+        fig_t = go.Figure()
         
-        # Se cambió el color de la TEA a un morado suave (#A855F7) y el texto se puso en 'outside' para evitar que se monte sobre la barra.
-        fig2.add_trace(go.Bar(x=years, y=tna_vals, name="TNA", marker_color="#38BDF8", text=[f"{v:.2f}%" for v in tna_vals], textposition="outside"))
-        fig2.add_trace(go.Bar(x=years, y=tea_vals, name="TEA", marker_color="#A855F7", text=[f"{v:.2f}%" for v in tea_vals], textposition="outside"))
-        fig2.add_trace(go.Bar(x=years, y=tir_vals, name="TIR", marker_color="#FBBF24", text=[f"{v:.2f}%" for v in tir_vals], textposition="outside"))
+        # Gráfico de Barras Horizontales Agrupado
+        fig_t.add_trace(go.Bar(y=[f"<b>{y}</b>" for y in years], x=tna_vals, orientation='h', name="TNA", marker_color="#38BDF8", text=[f"<b>{v:.2f}%</b>" for v in tna_vals], textposition="auto", insidetextanchor='end'))
+        fig_t.add_trace(go.Bar(y=[f"<b>{y}</b>" for y in years], x=tea_vals, orientation='h', name="TEA", marker_color="#A855F7", text=[f"<b>{v:.2f}%</b>" for v in tea_vals], textposition="auto", insidetextanchor='end'))
+        fig_t.add_trace(go.Bar(y=[f"<b>{y}</b>" for y in years], x=tir_vals, orientation='h', name="TIR", marker_color="#FBBF24", text=[f"<b>{v:.2f}%</b>" for v in tir_vals], textposition="auto", insidetextanchor='end'))
         
-        # Aumentamos el rango de Y (hasta un 25% más alto del máximo) para que los textos 'outside' no se corten arriba
-        max_tasa = max(max(tna_vals), max(tea_vals), max(tir_vals)) if tna_vals else 10
-        
-        fig2.update_layout(
+        fig_t.update_layout(
             barmode='group',
-            title="Evolución de Tasas de Rendimiento",
-            template="plotly_dark",
-            yaxis_ticksuffix="%",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            dragmode=False,
-            margin=dict(l=10, r=10, t=50, b=10),
-            yaxis=dict(range=[0, max_tasa * 1.25])
-        )
-        fig2.update_xaxes(fixedrange=True)
-        fig2.update_yaxes(fixedrange=True)
-        st.plotly_chart(fig2, use_container_width=True, config=plotly_config)
-
-    with tab_int:
-        fig3 = make_subplots(specs=[[{"secondary_y": True}]])
-        
-        # Línea de Interés Mensual
-        fig3.add_trace(go.Scatter(
-            x=years, y=int_mensual_pond, mode='lines+markers+text', name="Int. Mensual", 
-            line=dict(color="#00D1B2", width=4),
-            marker=dict(size=12, color="#00D1B2"),
-            text=[f"${v:,.2f}" for v in int_mensual_pond], 
-            textposition="top center",
-            textfont=dict(size=13, color="#00D1B2")
-        ), secondary_y=False)
-
-        # Línea de Interés Diario
-        fig3.add_trace(go.Scatter(
-            x=years, y=int_diario_prom, mode='lines+markers+text', name="Int. Diario", 
-            line=dict(color="#A855F7", width=4, dash='dot'),
-            marker=dict(size=12, color="#A855F7"),
-            text=[f"${v:,.2f}" for v in int_diario_prom], 
-            textposition="bottom center",
-            textfont=dict(size=13, color="#A855F7")
-        ), secondary_y=True)
-        
-        fig3.update_layout(
-            title="Interés Mensual vs Diario",
             template="plotly_dark",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            dragmode=False,
-            margin=dict(l=10, r=10, t=50, b=10)
+            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), # Leyenda arriba. Ya no choca porque el título está afuera del componente.
+            margin=dict(l=10, r=50, t=30, b=10),
+            dragmode=False
         )
+        fig_t.update_xaxes(fixedrange=True, visible=False)
+        fig_t.update_yaxes(fixedrange=True, autorange="reversed", tickfont=dict(size=14, color="white"))
         
-        # ALTERAMOS LA ESCALA DEL EJE SECUNDARIO: 
-        # Multiplicamos el rango máximo por 2.5 para empujar la línea de interés diario hacia la mitad inferior del gráfico.
-        # De este modo, las líneas ya no colisionan visualmente.
-        max_mensual = max(int_mensual_pond) if int_mensual_pond else 100
-        max_diario = max(int_diario_prom) if int_diario_prom else 10
-        
-        fig3.update_xaxes(fixedrange=True, showgrid=False)
-        fig3.update_yaxes(fixedrange=True, secondary_y=False, showgrid=False, range=[0, max_mensual * 1.3])
-        fig3.update_yaxes(fixedrange=True, secondary_y=True, showgrid=False, range=[0, max_diario * 2.5], showticklabels=False)
-
-        st.plotly_chart(fig3, use_container_width=True, config=plotly_config)
+        st.plotly_chart(fig_t, use_container_width=True, config=plotly_config)
