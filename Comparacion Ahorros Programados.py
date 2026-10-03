@@ -449,23 +449,23 @@ if all(wb is not None for wb in wbs.values()):
     st.divider()
     st.subheader("📊 Análisis Gráfico de Ahorros")
 
-    # Extracción de datos para los distintos gráficos
+    # Extracción de Interés Mensual (BF), Saldo (AD), Interés Diario (M/R) e Interés Acumulado (AG)
     datos_int_mensual = {}
     datos_saldo_fin_mes = {}
-    datos_int_diario_prom = {}
+    datos_int_diario = {}
+    datos_int_acumulado = {}
 
     for year, wb in wbs.items():
         sheet = wb.active
         valores_bf = []
         valores_ad = []
-        month_data_r = {}
+        valores_ag = []
         
-        # Recorremos las filas desde la 1 hasta el final
+        # Recorremos las filas desde la 1 hasta el final para BF, AD y AG
         for r in range(1, sheet.max_row + 1):
             val_bf = sheet[f"BF{r}"].value
             val_ad = sheet[f"AD{r}"].value
-            val_m = sheet[f"M{r}"].value
-            val_r = sheet[f"R{r}"].value
+            val_ag = sheet[f"AG{r}"].value
             
             # Extraemos los valores numéricos válidos de la columna BF (Interés Mensual)
             if val_bf is not None and type(val_bf) in (int, float) and not isinstance(val_bf, bool):
@@ -475,28 +475,60 @@ if all(wb is not None for wb in wbs.values()):
             if val_ad is not None and type(val_ad) in (int, float) and not isinstance(val_ad, bool):
                 valores_ad.append(float(val_ad))
 
-            # Extraemos y agrupamos los valores de la columna R (Interés Diario) agrupados por mes (Columna M)
-            if val_r is not None and type(val_r) in (int, float) and not isinstance(val_r, bool):
-                val_num_r = float(val_r)
-                key_m = None
-                if hasattr(val_m, 'year') and hasattr(val_m, 'month'):
-                    key_m = (val_m.year, val_m.month)
-                elif isinstance(val_m, str) and val_m.strip():
-                    key_m = val_m.strip()
-                
-                if key_m is None:
-                    key_m = f"Row_{r}"
-                    
-                if key_m not in month_data_r:
-                    month_data_r[key_m] = []
-                month_data_r[key_m].append(val_num_r)
+            # Extraemos los valores numéricos válidos de la columna AG (Interés Ganado Mensual para Acumular)
+            if val_ag is not None and type(val_ag) in (int, float) and not isinstance(val_ag, bool):
+                valores_ag.append(float(val_ag))
                 
         datos_int_mensual[year] = valores_bf
         datos_saldo_fin_mes[year] = valores_ad
-        datos_int_diario_prom[year] = [sum(v)/len(v) for v in month_data_r.values() if v]
+        
+        # Cálculo del Interés Acumulado Creciente (Suma acumulativa de la columna AG)
+        datos_int_acumulado[year] = list(np.cumsum(valores_ag)) if valores_ag else []
 
-    tab_mensual, tab_saldo, tab_diario, tab_tasas = st.tabs([
-        "💰 Interés Mensual", "🏦 Saldo Fin de Mes", "⏱️ Interés Diario Promedio", "📉 Comparativa de Tasas"
+        # Extracción y cálculo del Interés Diario Promedio por mes desde Columna M (fechas) y Columna R (interés diario)
+        rows_diario = []
+        for r in range(1, sheet.max_row + 1):
+            val_m = sheet[f"M{r}"].value
+            val_r = sheet[f"R{r}"].value
+            
+            if val_r is not None and type(val_r) in (int, float) and not isinstance(val_r, bool):
+                date_key = None
+                if hasattr(val_m, 'year') and hasattr(val_m, 'month'):
+                    date_key = (val_m.year, val_m.month)
+                elif isinstance(val_m, str):
+                    try:
+                        dt = pd.to_datetime(val_m, dayfirst=True, errors='coerce')
+                        if pd.notna(dt):
+                            date_key = (dt.year, dt.month)
+                    except:
+                        pass
+                
+                rows_diario.append({
+                    'date_key': date_key,
+                    'val_m': str(val_m) if val_m is not None else "",
+                    'val_r': float(val_r)
+                })
+        
+        if rows_diario:
+            df_diario = pd.DataFrame(rows_diario)
+            if df_diario['date_key'].notna().any():
+                df_valid = df_diario[df_diario['date_key'].notna()].copy()
+                valores_r_prom = df_valid.groupby('date_key', sort=False)['val_r'].mean().tolist()
+            elif df_diario['val_m'].notna().any():
+                valores_r_prom = df_diario.groupby('val_m', sort=False)['val_r'].mean().tolist()
+            else:
+                valores_r_prom = df_diario['val_r'].tolist()
+        else:
+            valores_r_prom = []
+            
+        datos_int_diario[year] = valores_r_prom
+
+    tab_mensual, tab_saldo, tab_diario, tab_acumulado, tab_tasas = st.tabs([
+        "💰 Interés Mensual", 
+        "🏦 Saldo Fin de Mes", 
+        "⏱️ Interés Diario Promedio", 
+        "📈 Interés Acumulado Creciente",
+        "📉 Comparativa de Tasas"
     ])
 
     plotly_config = {'displayModeBar': False, 'staticPlot': True}
@@ -514,10 +546,8 @@ if all(wb is not None for wb in wbs.values()):
 
             for year in ["2024", "2025", "2026"]:
                 valores = datos_int_mensual.get(year, [])
-                # Completar con ceros si este ahorro tiene menos meses
                 valores_pad = valores + [0.0] * (max_meses - len(valores))
                 
-                # Formato de texto para la barra (solo si el valor es mayor a 0)
                 text_vals = [f"<b>${v:,.2f}</b>".replace(".", "X").replace(",", ".").replace("X", ",") if v > 0 else "" for v in valores_pad]
 
                 fig_m.add_trace(go.Bar(
@@ -552,7 +582,6 @@ if all(wb is not None for wb in wbs.values()):
     with tab_saldo:
         st.markdown("<h5 style='text-align: center; color: #3B82F6; margin-bottom: 0;'>Saldo Fin de Mes (Columna AD)</h5>", unsafe_allow_html=True)
         
-        # Determinar el número máximo de meses para saldo fin de mes
         max_meses_saldo = max([len(v) for v in datos_saldo_fin_mes.values()] + [0])
         
         if max_meses_saldo > 0:
@@ -582,7 +611,7 @@ if all(wb is not None for wb in wbs.values()):
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=max(350, max_meses_saldo * 70), # Altura dinámica
+                height=max(350, max_meses_saldo * 70),
                 margin=dict(l=10, r=80, t=10, b=10),
                 dragmode=False,
                 legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
@@ -595,17 +624,16 @@ if all(wb is not None for wb in wbs.values()):
             st.warning("No se encontraron datos en la columna AD de los archivos Excel.")
 
     with tab_diario:
-        st.markdown("<h5 style='text-align: center; color: #A855F7; margin-bottom: 0;'>Interés Diario Promedio (Columna R)</h5>", unsafe_allow_html=True)
+        st.markdown("<h5 style='text-align: center; color: #A855F7; margin-bottom: 0;'>Interés Diario Promedio (Columnas M y R)</h5>", unsafe_allow_html=True)
         
-        # Determinar el número máximo de meses para interés diario promedio
-        max_meses_diario = max([len(v) for v in datos_int_diario_prom.values()] + [0])
+        max_meses_diario = max([len(v) for v in datos_int_diario.values()] + [0])
         
         if max_meses_diario > 0:
             etiquetas_meses_d = [f"Mes {i+1}" for i in range(max_meses_diario)]
             fig_d = go.Figure()
 
             for year in ["2024", "2025", "2026"]:
-                valores_d = datos_int_diario_prom.get(year, [])
+                valores_d = datos_int_diario.get(year, [])
                 valores_pad_d = valores_d + [0.0] * (max_meses_diario - len(valores_d))
                 
                 text_vals_d = [f"<b>${v:,.2f}</b>".replace(".", "X").replace(",", ".").replace("X", ",") if v > 0 else "" for v in valores_pad_d]
@@ -627,7 +655,7 @@ if all(wb is not None for wb in wbs.values()):
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=max(350, max_meses_diario * 70), # Altura dinámica
+                height=max(350, max_meses_diario * 70),
                 margin=dict(l=10, r=80, t=10, b=10),
                 dragmode=False,
                 legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
@@ -637,7 +665,51 @@ if all(wb is not None for wb in wbs.values()):
 
             st.plotly_chart(fig_d, use_container_width=True, config=plotly_config)
         else:
-            st.warning("No se encontraron datos en la columna R de los archivos Excel.")
+            st.warning("No se encontraron datos de interés diario en las columnas M y R de los archivos Excel.")
+
+    with tab_acumulado:
+        st.markdown("<h5 style='text-align: center; color: #10B981; margin-bottom: 0;'>Interés Acumulado Creciente (Columna AG Sumada Mes a Mes)</h5>", unsafe_allow_html=True)
+        
+        max_meses_acum = max([len(v) for v in datos_int_acumulado.values()] + [0])
+        
+        if max_meses_acum > 0:
+            etiquetas_meses_a = [f"Mes {i+1}" for i in range(max_meses_acum)]
+            fig_a = go.Figure()
+
+            for year in ["2024", "2025", "2026"]:
+                valores_a = datos_int_acumulado.get(year, [])
+                valores_pad_a = valores_a + [0.0] * (max_meses_acum - len(valores_a))
+                
+                text_vals_a = [f"<b>${v:,.2f}</b>".replace(".", "X").replace(",", ".").replace("X", ",") if v > 0 else "" for v in valores_pad_a]
+
+                fig_a.add_trace(go.Bar(
+                    name=year,
+                    y=[f"<b>{m}</b>" for m in etiquetas_meses_a],
+                    x=valores_pad_a,
+                    orientation='h',
+                    marker_color=colores_anios[year],
+                    text=text_vals_a,
+                    textangle=0,            # Texto siempre horizontal
+                    textposition='auto',    # Adentro si cabe, afuera a la derecha si es barra corta
+                    insidetextanchor='end'  # Pegado al extremo derecho si está adentro
+                ))
+
+            fig_a.update_layout(
+                barmode='group',
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=max(350, max_meses_acum * 70),
+                margin=dict(l=10, r=80, t=10, b=10),
+                dragmode=False,
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
+            )
+            fig_a.update_xaxes(fixedrange=True, visible=False)
+            fig_a.update_yaxes(fixedrange=True, autorange="reversed", tickfont=dict(size=12, color="white"))
+
+            st.plotly_chart(fig_a, use_container_width=True, config=plotly_config)
+        else:
+            st.warning("No se encontraron datos de interés en la columna AG de los archivos Excel.")
 
     with tab_tasas:
         st.markdown("<h5 style='text-align: center; color: #FBBF24; margin-bottom: 0;'>Comparativa Resumen de Tasas</h5>", unsafe_allow_html=True)
