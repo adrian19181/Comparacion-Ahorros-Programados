@@ -449,24 +449,32 @@ if all(wb is not None for wb in wbs.values()):
     st.divider()
     st.subheader("📊 Análisis Gráfico de Ahorros")
 
-    # Extracción directa de las columnas AZ (Fechas) y BF (Interés Mensual)
+    # Extracción de Interés Mensual (Columna BF) y Saldo Fin de Mes (Columna AD)
     datos_int_mensual = {}
+    datos_saldo_fin_mes = {}
+
     for year, wb in wbs.items():
         sheet = wb.active
         valores_bf = []
+        valores_ad = []
         
         # Recorremos las filas desde la 1 hasta el final
         for r in range(1, sheet.max_row + 1):
-            val_az = sheet[f"AZ{r}"].value
             val_bf = sheet[f"BF{r}"].value
+            val_ad = sheet[f"AD{r}"].value
             
-            # Extraemos los valores numéricos válidos de la columna BF
+            # Extraemos los valores numéricos válidos de la columna BF (Interés Mensual)
             if val_bf is not None and type(val_bf) in (int, float):
                 valores_bf.append(float(val_bf))
                 
+            # Extraemos los valores numéricos válidos de la columna AD (Saldo Fin de Mes)
+            if val_ad is not None and type(val_ad) in (int, float):
+                valores_ad.append(float(val_ad))
+                
         datos_int_mensual[year] = valores_bf
+        datos_saldo_fin_mes[year] = valores_ad
 
-    tab_mensual, tab_tasas = st.tabs(["💰 Interés Mensual", "📉 Comparativa de Tasas"])
+    tab_mensual, tab_saldo, tab_tasas = st.tabs(["💰 Interés Mensual", "🏦 Saldo Fin de Mes", "📉 Comparativa de Tasas"])
 
     plotly_config = {'displayModeBar': False, 'staticPlot': True}
     colores_anios = {"2024": "#38BDF8", "2025": "#A855F7", "2026": "#FBBF24"} # Azul, Morado, Amarillo
@@ -517,6 +525,51 @@ if all(wb is not None for wb in wbs.values()):
             st.plotly_chart(fig_m, use_container_width=True, config=plotly_config)
         else:
             st.warning("No se encontraron datos en la columna BF de los archivos Excel.")
+
+    with tab_saldo:
+        st.markdown("<h5 style='text-align: center; color: #3B82F6; margin-bottom: 0;'>Saldo Fin de Mes (Columna AD)</h5>", unsafe_allow_html=True)
+        
+        # Determinar el número máximo de meses para saldo fin de mes
+        max_meses_saldo = max([len(v) for v in datos_saldo_fin_mes.values()] + [0])
+        
+        if max_meses_saldo > 0:
+            etiquetas_meses_s = [f"Mes {i+1}" for i in range(max_meses_saldo)]
+            fig_s = go.Figure()
+
+            for year in ["2024", "2025", "2026"]:
+                valores_s = datos_saldo_fin_mes.get(year, [])
+                valores_pad_s = valores_s + [0.0] * (max_meses_saldo - len(valores_s))
+                
+                text_vals_s = [f"<b>${v:,.2f}</b>".replace(".", "X").replace(",", ".").replace("X", ",") if v > 0 else "" for v in valores_pad_s]
+
+                fig_s.add_trace(go.Bar(
+                    name=year,
+                    y=[f"<b>{m}</b>" for m in etiquetas_meses_s],
+                    x=valores_pad_s,
+                    orientation='h',
+                    marker_color=colores_anios[year],
+                    text=text_vals_s,
+                    textangle=0,            # Texto siempre horizontal
+                    textposition='auto',    # Adentro si cabe, afuera a la derecha si es barra corta
+                    insidetextanchor='end'  # Pegado al extremo derecho si está adentro
+                ))
+
+            fig_s.update_layout(
+                barmode='group',
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=max(350, max_meses_saldo * 70), # Altura dinámica
+                margin=dict(l=10, r=80, t=10, b=10),
+                dragmode=False,
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
+            )
+            fig_s.update_xaxes(fixedrange=True, visible=False)
+            fig_s.update_yaxes(fixedrange=True, autorange="reversed", tickfont=dict(size=12, color="white"))
+
+            st.plotly_chart(fig_s, use_container_width=True, config=plotly_config)
+        else:
+            st.warning("No se encontraron datos en la columna AD de los archivos Excel.")
 
     with tab_tasas:
         st.markdown("<h5 style='text-align: center; color: #FBBF24; margin-bottom: 0;'>Comparativa Resumen de Tasas</h5>", unsafe_allow_html=True)
