@@ -90,10 +90,11 @@ def str_to_float(val_str):
 
 # --- AUTO-EXTRACTOR DE LA TABLA MENSUAL ---
 def extraer_tabla_mensual(sheet):
-    """Busca inteligentemente la tabla mensual en el Excel analizando los encabezados"""
+    """Busca inteligentemente la tabla mensual en el Excel analizando los encabezados y evita duplicados"""
     df_data = []
     header_row = None
     cols = {'mes': -1, 'int_mensual': -1, 'saldo': -1, 'int_diario': -1, 'acumulado': -1}
+    meses_vistos = set() # Escudo anti-duplicados
     
     for i, row in enumerate(sheet.iter_rows(values_only=True)):
         row_str = [str(x).lower() if x is not None else "" for x in row]
@@ -114,14 +115,21 @@ def extraer_tabla_mensual(sheet):
         # 2. Extraer los datos mes a mes
         if header_row is not None:
             mes_val = row[cols['mes']]
+            
             # Si la columna mes está vacía o no es un número, asumimos que terminó la tabla
             if not isinstance(mes_val, (int, float)) and not str(mes_val).isdigit():
                 if len(df_data) > 0: break 
                 continue
             
             try:
+                mes_int = int(mes_val)
+                # Escudo anti-duplicados: Si ya leímos este mes, lo ignoramos para no colgar el gráfico
+                if mes_int in meses_vistos:
+                    continue
+                meses_vistos.add(mes_int)
+                
                 df_data.append({
-                    "Mes": f"Mes {int(mes_val)}",
+                    "Mes": f"Mes {mes_int}",
                     "Int_Mensual": float(row[cols['int_mensual']]) if cols['int_mensual'] != -1 and row[cols['int_mensual']] is not None else 0.0,
                     "Saldo": float(row[cols['saldo']]) if cols['saldo'] != -1 and row[cols['saldo']] is not None else 0.0,
                     "Int_Diario": float(row[cols['int_diario']]) if cols['int_diario'] != -1 and row[cols['int_diario']] is not None else 0.0,
@@ -132,7 +140,7 @@ def extraer_tabla_mensual(sheet):
     return pd.DataFrame(df_data)
 
 def generar_datos_mensuales_mock(datos_resumen):
-    """Si el auto-extractor no encuentra la tabla, genera una progresión matemática real basada en los totales para que los gráficos funcionen"""
+    """Si el auto-extractor falla, genera una progresión matemática real basada en los totales para no romper la app"""
     meses = 12
     try:
         dias = int(str(datos_resumen["total_dias"]).split()[0])
@@ -209,7 +217,6 @@ if all(wb is not None for wb in wbs.values()):
         # 2. Extracción Tabla Mensual
         df_mensual = extraer_tabla_mensual(sheet)
         if df_mensual.empty:
-            # Respaldo de seguridad si no encuentra la tabla
             df_mensual = generar_datos_mensuales_mock(datos[year])
         datos_mensuales[year] = df_mensual
 
@@ -230,7 +237,6 @@ if all(wb is not None for wb in wbs.values()):
 </style>"""
     st.markdown(css_tablas, unsafe_allow_html=True)
 
-    # (Las tablas HTML permanecen iguales)
     st.subheader("📋 Condiciones del Ahorro Programado")
     html_condiciones = f"""<div class="excel-tbl-card"><table class="excel-tbl"><thead><tr><th>Condiciones</th><th>2024</th><th>2025</th><th>2026</th></tr></thead><tbody>
 <tr><td class="lbl-yellow">Tasa Nominal Anual</td><td class="val-green">{datos["2024"]["tna"]}</td><td class="val-green">{datos["2025"]["tna"]}</td><td class="val-green">{datos["2026"]["tna"]}</td></tr>
@@ -241,6 +247,8 @@ if all(wb is not None for wb in wbs.values()):
 </tbody></table></div>"""
     st.markdown(html_condiciones, unsafe_allow_html=True)
 
+    st.divider()
+
     st.subheader("📊 Resultados")
     html_resultados = f"""<div class="excel-tbl-card"><table class="excel-tbl"><thead><tr><th>Resultados</th><th>2024</th><th>2025</th><th>2026</th></tr></thead><tbody>
 <tr><td class="lbl-yellow">Total Interés Ganados</td><td class="val-green">{datos["2024"]["int_ganados"]}</td><td class="val-green">{datos["2025"]["int_ganados"]}</td><td class="val-green">{datos["2026"]["int_ganados"]}</td></tr>
@@ -250,6 +258,8 @@ if all(wb is not None for wb in wbs.values()):
 <tr><td class="lbl-yellow">Total Ganado Incluido Intereses</td><td class="val-green">{datos["2024"]["total_ganado"]}</td><td class="val-green">{datos["2025"]["total_ganado"]}</td><td class="val-green">{datos["2026"]["total_ganado"]}</td></tr>
 </tbody></table></div>"""
     st.markdown(html_resultados, unsafe_allow_html=True)
+
+    st.divider()
 
     st.subheader("📈 Rendimientos")
     html_rendimientos = f"""<div class="excel-tbl-card"><table class="excel-tbl"><thead><tr><th>Rendimientos</th><th>2024</th><th>2025</th><th>2026</th></tr></thead><tbody>
@@ -265,31 +275,41 @@ if all(wb is not None for wb in wbs.values()):
     st.markdown(html_rendimientos, unsafe_allow_html=True)
 
     # ==============================================================================
-    # 4. GRÁFICOS DINÁMICOS MES A MES
+    # 4. GRÁFICOS DINÁMICOS MES A MES (CORREGIDO)
     # ==============================================================================
     st.divider()
     st.subheader("📊 Análisis Gráfico Mes a Mes")
 
     tab_mensual, tab_saldo, tab_diario, tab_acumulado, tab_tasas = st.tabs([
-        "💰 Mensual", "🏦 Saldo", "⏱️️ Diario", "📈 Acumulado", "📉 Tasas"
+        "💰 Mensual", "🏦 Saldo", "⏱ Diario", "📈 Acumulado", "📉 Tasas"
     ])
     
     plotly_config = {'displayModeBar': False, 'staticPlot': True}
     colores_anios = {"2024": "#38BDF8", "2025": "#A855F7", "2026": "#FBBF24"} # Azul, Morado, Amarillo
 
     def plot_comparativa_mensual(datos_dict, metrica_columna):
-        """Genera barras horizontales agrupadas por cada mes comparando los 3 años"""
+        """Genera barras horizontales agrupadas por cada mes comparando los 3 años a prueba de fallos"""
         fig = go.Figure()
         
-        # Encontrar el máximo de meses entre todos los años para alinear el Eje Y
-        max_meses = max([len(df) for df in datos_dict.values()] + [0])
+        # Encontrar el máximo de meses eliminando duplicados por seguridad absoluta
+        max_meses = 0
+        for df in datos_dict.values():
+            if not df.empty and "Mes" in df.columns:
+                df_clean = df.drop_duplicates(subset=["Mes"])
+                if len(df_clean) > max_meses:
+                    max_meses = len(df_clean)
+                    
+        if max_meses == 0:
+            return fig
+            
         etiquetas_meses = [f"Mes {i}" for i in range(1, max_meses + 1)]
         
         for year in ["2024", "2025", "2026"]:
             df = datos_dict.get(year, pd.DataFrame())
-            if not df.empty:
-                # Alinear datos a la lista maestra de meses rellenando con ceros si falta
-                df_alineado = df.set_index("Mes").reindex(etiquetas_meses).fillna(0)
+            if not df.empty and "Mes" in df.columns:
+                # El drop_duplicates(subset=["Mes"]) final evita el TypeError/ValueError en el reindex
+                df_clean = df.drop_duplicates(subset=["Mes"])
+                df_alineado = df_clean.set_index("Mes").reindex(etiquetas_meses).fillna(0)
                 valores = df_alineado[metrica_columna].tolist()
                 
                 # Formato de texto: si es 0, no mostrar nada para mantener limpio
@@ -302,10 +322,9 @@ if all(wb is not None for wb in wbs.values()):
                     orientation='h',
                     marker_color=colores_anios[year],
                     text=text_vals,
-                    # LA MAGIA ESTÁ AQUÍ:
-                    textangle=0,            # Fuerza a que el texto SIEMPRE sea horizontal
-                    textposition='auto',    # Si cabe, adentro; si la barra es corta, afuera a la derecha
-                    insidetextanchor='end'  # Si está adentro, que se pegue al extremo derecho de la barra
+                    textangle=0,            # Texto 100% horizontal garantizado
+                    textposition='auto',    # Adentro si cabe, empujado afuera a la derecha si no cabe
+                    insidetextanchor='end'  # Si está adentro, pegado al extremo derecho de la barra
                 ))
                 
         fig.update_layout(
@@ -313,9 +332,11 @@ if all(wb is not None for wb in wbs.values()):
             template="plotly_dark",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=10, r=60, t=10, b=10), # r=60 deja espacio libre por si el texto se sale de la barra
+            # Altura dinámica: Evita que las barras se aplasten cuando hay muchos meses
+            height=max(400, max_meses * 90),
+            margin=dict(l=10, r=80, t=10, b=10), # r=80 da amplio margen derecho para números externos
             dragmode=False,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
         )
         fig.update_xaxes(fixedrange=True, visible=False)
         fig.update_yaxes(fixedrange=True, autorange="reversed", tickfont=dict(size=12, color="white"))
@@ -348,13 +369,15 @@ if all(wb is not None for wb in wbs.values()):
         
         fig_t = go.Figure()
         anios = ["2024", "2025", "2026"]
+        
         fig_t.add_trace(go.Bar(y=[f"<b>{y}</b>" for y in anios], x=tna_vals, orientation='h', name="TNA", marker_color="#38BDF8", text=[f"<b>{v:.2f}%</b>" for v in tna_vals], textposition="auto", textangle=0, insidetextanchor='end'))
         fig_t.add_trace(go.Bar(y=[f"<b>{y}</b>" for y in anios], x=tea_vals, orientation='h', name="TEA", marker_color="#A855F7", text=[f"<b>{v:.2f}%</b>" for v in tea_vals], textposition="auto", textangle=0, insidetextanchor='end'))
         fig_t.add_trace(go.Bar(y=[f"<b>{y}</b>" for y in anios], x=tir_vals, orientation='h', name="TIR", marker_color="#FBBF24", text=[f"<b>{v:.2f}%</b>" for v in tir_vals], textposition="auto", textangle=0, insidetextanchor='end'))
         
         fig_t.update_layout(
             barmode='group', template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), margin=dict(l=10, r=50, t=30, b=10), dragmode=False
+            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5), margin=dict(l=10, r=60, t=30, b=10), dragmode=False,
+            height=300
         )
         fig_t.update_xaxes(fixedrange=True, visible=False)
         fig_t.update_yaxes(fixedrange=True, autorange="reversed", tickfont=dict(size=14, color="white"))
