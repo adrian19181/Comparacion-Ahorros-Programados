@@ -449,16 +449,17 @@ if all(wb is not None for wb in wbs.values()):
     st.divider()
     st.subheader("📊 Análisis Gráfico de Ahorros")
 
-    # Extracción de Interés Mensual (Columna BF) y Saldo Fin de Mes (Columna AD)
+    # Extracción de Interés Mensual (Columna BF), Saldo Fin de Mes (Columna AD) e Interés Diario Promedio (ColM / ColR)
     datos_int_mensual = {}
     datos_saldo_fin_mes = {}
+    datos_int_diario = {}
 
     for year, wb in wbs.items():
         sheet = wb.active
         valores_bf = []
         valores_ad = []
         
-        # Recorremos las filas desde la 1 hasta el final
+        # Recorremos las filas desde la 1 hasta el final para BF y AD
         for r in range(1, sheet.max_row + 1):
             val_bf = sheet[f"BF{r}"].value
             val_ad = sheet[f"AD{r}"].value
@@ -474,7 +475,50 @@ if all(wb is not None for wb in wbs.values()):
         datos_int_mensual[year] = valores_bf
         datos_saldo_fin_mes[year] = valores_ad
 
-    tab_mensual, tab_saldo, tab_tasas = st.tabs(["💰 Interés Mensual", "🏦 Saldo Fin de Mes", "📉 Comparativa de Tasas"])
+        # Extracción y cálculo del Interés Diario Promedio por mes desde Columna M (fechas) y Columna R (interés diario)
+        rows_diario = []
+        for r in range(1, sheet.max_row + 1):
+            val_m = sheet[f"M{r}"].value
+            val_r = sheet[f"R{r}"].value
+            
+            if val_r is not None and type(val_r) in (int, float) and not isinstance(val_r, bool):
+                date_key = None
+                if hasattr(val_m, 'year') and hasattr(val_m, 'month'):
+                    date_key = (val_m.year, val_m.month)
+                elif isinstance(val_m, str):
+                    try:
+                        dt = pd.to_datetime(val_m, dayfirst=True, errors='coerce')
+                        if pd.notna(dt):
+                            date_key = (dt.year, dt.month)
+                    except:
+                        pass
+                
+                rows_diario.append({
+                    'date_key': date_key,
+                    'val_m': str(val_m) if val_m is not None else "",
+                    'val_r': float(val_r)
+                })
+        
+        if rows_diario:
+            df_diario = pd.DataFrame(rows_diario)
+            if df_diario['date_key'].notna().any():
+                df_valid = df_diario[df_diario['date_key'].notna()].copy()
+                valores_r_prom = df_valid.groupby('date_key', sort=False)['val_r'].mean().tolist()
+            elif df_diario['val_m'].notna().any():
+                valores_r_prom = df_diario.groupby('val_m', sort=False)['val_r'].mean().tolist()
+            else:
+                valores_r_prom = df_diario['val_r'].tolist()
+        else:
+            valores_r_prom = []
+            
+        datos_int_diario[year] = valores_r_prom
+
+    tab_mensual, tab_saldo, tab_diario, tab_tasas = st.tabs([
+        "💰 Interés Mensual", 
+        "🏦 Saldo Fin de Mes", 
+        "⏱️ Interés Diario Promedio", 
+        "📉 Comparativa de Tasas"
+    ])
 
     plotly_config = {'displayModeBar': False, 'staticPlot': True}
     colores_anios = {"2024": "#38BDF8", "2025": "#A855F7", "2026": "#FBBF24"} # Azul, Morado, Amarillo
@@ -570,6 +614,51 @@ if all(wb is not None for wb in wbs.values()):
             st.plotly_chart(fig_s, use_container_width=True, config=plotly_config)
         else:
             st.warning("No se encontraron datos en la columna AD de los archivos Excel.")
+
+    with tab_diario:
+        st.markdown("<h5 style='text-align: center; color: #A855F7; margin-bottom: 0;'>Interés Diario Promedio (Columnas M y R)</h5>", unsafe_allow_html=True)
+        
+        # Determinar el número máximo de meses para interés diario promedio
+        max_meses_diario = max([len(v) for v in datos_int_diario.values()] + [0])
+        
+        if max_meses_diario > 0:
+            etiquetas_meses_d = [f"Mes {i+1}" for i in range(max_meses_diario)]
+            fig_d = go.Figure()
+
+            for year in ["2024", "2025", "2026"]:
+                valores_d = datos_int_diario.get(year, [])
+                valores_pad_d = valores_d + [0.0] * (max_meses_diario - len(valores_d))
+                
+                text_vals_d = [f"<b>${v:,.2f}</b>".replace(".", "X").replace(",", ".").replace("X", ",") if v > 0 else "" for v in valores_pad_d]
+
+                fig_d.add_trace(go.Bar(
+                    name=year,
+                    y=[f"<b>{m}</b>" for m in etiquetas_meses_d],
+                    x=valores_pad_d,
+                    orientation='h',
+                    marker_color=colores_anios[year],
+                    text=text_vals_d,
+                    textangle=0,            # Texto siempre horizontal
+                    textposition='auto',    # Adentro si cabe, afuera a la derecha si es barra corta
+                    insidetextanchor='end'  # Pegado al extremo derecho si está adentro
+                ))
+
+            fig_d.update_layout(
+                barmode='group',
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=max(350, max_meses_diario * 70), # Altura dinámica
+                margin=dict(l=10, r=80, t=10, b=10),
+                dragmode=False,
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
+            )
+            fig_d.update_xaxes(fixedrange=True, visible=False)
+            fig_d.update_yaxes(fixedrange=True, autorange="reversed", tickfont=dict(size=12, color="white"))
+
+            st.plotly_chart(fig_d, use_container_width=True, config=plotly_config)
+        else:
+            st.warning("No se encontraron datos de interés diario en las columnas M y R de los archivos Excel.")
 
     with tab_tasas:
         st.markdown("<h5 style='text-align: center; color: #FBBF24; margin-bottom: 0;'>Comparativa Resumen de Tasas</h5>", unsafe_allow_html=True)
