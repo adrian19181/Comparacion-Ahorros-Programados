@@ -480,13 +480,13 @@ if all(wb is not None for wb in wbs.values()):
 <td class="val-purple">{datos["2026"]["tea"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">ROI (Rentabilidad Acumulada)</td>
+<td class="lbl-yellow">ROI (Rentabilidad Acumulada)<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Int. Ganado / Dep. sin Int.)</span></td>
 <td class="val-green">{datos["2024"]["roi"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2024"]["int_ganados"]} / {datos["2024"]["dep_sin_int"]})</span></td>
 <td class="val-green">{datos["2025"]["roi"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2025"]["int_ganados"]} / {datos["2025"]["dep_sin_int"]})</span></td>
 <td class="val-green">{datos["2026"]["roi"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2026"]["int_ganados"]} / {datos["2026"]["dep_sin_int"]})</span></td>
 </tr>
 <tr>
-<td class="lbl-yellow">Ratio de Ganancia</td>
+<td class="lbl-yellow">Ratio de Ganancia<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Int. Ganado / Total Ganado)</span></td>
 <td class="val-purple">{datos["2024"]["ratio_ganancia"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2024"]["int_ganados"]} / {datos["2024"]["total_ganado"]})</span></td>
 <td class="val-purple">{datos["2025"]["ratio_ganancia"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2025"]["int_ganados"]} / {datos["2025"]["total_ganado"]})</span></td>
 <td class="val-purple">{datos["2026"]["ratio_ganancia"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2026"]["int_ganados"]} / {datos["2026"]["total_ganado"]})</span></td>
