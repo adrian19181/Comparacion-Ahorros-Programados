@@ -1,4 +1,5 @@
 import sys
+import datetime
 import io
 import requests
 import openpyxl
@@ -93,6 +94,21 @@ def fmt_porcentaje(val):
     except:
         return str(val)
 
+def parse_fecha_dt(val):
+    if val is None:
+        return None
+    if isinstance(val, datetime.datetime):
+        return val.date()
+    if isinstance(val, datetime.date):
+        return val
+    try:
+        dt = pd.to_datetime(val, dayfirst=True)
+        if pd.notna(dt):
+            return dt.date()
+    except:
+        pass
+    return None
+
 def str_to_float(val_str):
     if val_str in ("-", "", None): return 0.0
     clean_str = str(val_str).replace("$", "").replace("%", "").replace(".", "").replace(",", ".")
@@ -123,6 +139,9 @@ for year, file_id in DRIVE_FILES.items():
 
 if all(wb is not None for wb in wbs.values()):
     datos = {}
+    total_int_ganados_acum = 0.0
+    total_dias_acum = 0
+
     for year, wb in wbs.items():
         sheet = wb.active
         
@@ -137,6 +156,21 @@ if all(wb is not None for wb in wbs.values()):
         d2_num = float(d2_raw) if isinstance(d2_raw, (int, float)) else 0.0
         d6_num = float(d6_raw) if isinstance(d6_raw, (int, float)) else 0.0
         ratio_ganancia_calc = (d2_num / d6_num) if d6_num > 0 else 0.0
+
+        total_int_ganados_acum += d2_num
+
+        f_ini_raw = obtener_valor(sheet, "F3", "H3")
+        f_fin_raw = obtener_valor(sheet, "F5", "H5")
+        dt_ini = parse_fecha_dt(f_ini_raw)
+        dt_fin = parse_fecha_dt(f_fin_raw)
+        if dt_ini and dt_fin:
+            dias_p = (dt_fin - dt_ini).days
+        else:
+            try:
+                dias_p = int(obtener_valor(sheet, "F6", "H6") or 0)
+            except:
+                dias_p = 0
+        total_dias_acum += max(0, dias_p)
 
         datos[year] = {
             # Sección 1: Condiciones
@@ -163,6 +197,10 @@ if all(wb is not None for wb in wbs.values()):
             "aportes_prom": fmt_moneda(sheet["D19"].value),
             "int_diario_prom": fmt_moneda(sheet["B19"].value)
         }
+
+    total_anios = total_dias_acum / 365.25 if total_dias_acum > 0 else 0.0
+    total_meses = total_anios * 12.0
+    ganancia_mensual_prom = (total_int_ganados_acum / total_meses) if total_meses > 0 else 0.0
 
     # ==============================================================================
     # ESTILOS CSS REUTILIZABLES COMPACTOS Y ADAPTATIVOS A MÓVIL
@@ -261,6 +299,29 @@ if all(wb is not None for wb in wbs.values()):
     font-weight: 600;
     white-space: nowrap;
 }
+.kpi-grid-res {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 15px;
+}
+.kpi-card-res {
+    background-color: #ffffff;
+    border: 1px solid #000000;
+    border-radius: 6px;
+    padding: 8px 10px;
+    flex: 1 1 140px;
+    min-width: 125px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    text-align: center;
+    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
+}
+.kpi-card-res-green { border-top: 4px solid #22C55E; background-color: #F0FDF4; }
+.kpi-card-res-blue { border-top: 4px solid #3B82F6; background-color: #EFF6FF; }
+.kpi-card-res-purple { border-top: 4px solid #8B5CF6; background-color: #F5F3FF; }
+.kpi-lbl-res { font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase; line-height: 1.2; margin-bottom: 4px; }
+.kpi-val-res { font-size: 16px; font-weight: bold; color: #000000; }
 </style>"""
 
     st.markdown(css_tablas, unsafe_allow_html=True)
@@ -371,6 +432,23 @@ if all(wb is not None for wb in wbs.values()):
 
     st.markdown(html_resultados, unsafe_allow_html=True)
 
+    html_kpis_resultados = f"""<div class="kpi-grid-res">
+<div class="kpi-card-res kpi-card-res-green">
+<div class="kpi-lbl-res">Total Interés Ganados</div>
+<div class="kpi-val-res">{fmt_moneda(total_int_ganados_acum)}</div>
+</div>
+<div class="kpi-card-res kpi-card-res-blue">
+<div class="kpi-lbl-res">Tiempo Total Acumulado</div>
+<div class="kpi-val-res">{f"{total_anios:.1f}".replace(".", ",")} años</div>
+</div>
+<div class="kpi-card-res kpi-card-res-purple">
+<div class="kpi-lbl-res">Ganancia por Mes</div>
+<div class="kpi-val-res">{fmt_moneda(ganancia_mensual_prom)}</div>
+</div>
+</div>"""
+
+    st.markdown(html_kpis_resultados, unsafe_allow_html=True)
+
     st.divider()
 
     # ==============================================================================
@@ -402,13 +480,13 @@ if all(wb is not None for wb in wbs.values()):
 <td class="val-purple">{datos["2026"]["tea"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">ROI (Rentabilidad Acumulada)</td>
+<td class="lbl-yellow">ROI (Rentabilidad Acumulada)<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Int. Ganado / Dep. sin Int.)</span></td>
 <td class="val-green">{datos["2024"]["roi"]}</td>
 <td class="val-green">{datos["2025"]["roi"]}</td>
 <td class="val-green">{datos["2026"]["roi"]}</td>
 </tr>
 <tr>
-<td class="lbl-yellow">Ratio de Ganancia</td>
+<td class="lbl-yellow">Ratio de Ganancia<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Int. Ganado / Total Ganado)</span></td>
 <td class="val-purple">{datos["2024"]["ratio_ganancia"]}</td>
 <td class="val-purple">{datos["2025"]["ratio_ganancia"]}</td>
 <td class="val-purple">{datos["2026"]["ratio_ganancia"]}</td>
