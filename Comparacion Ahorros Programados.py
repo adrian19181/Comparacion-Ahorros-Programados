@@ -123,14 +123,6 @@ for year, file_id in DRIVE_FILES.items():
 
 if all(wb is not None for wb in wbs.values()):
     datos = {}
-    totales_consolidados = {
-        "int_ganados": 0.0,
-        "dep_mensuales": 0.0,
-        "dep_personales": 0.0,
-        "dep_sin_int": 0.0,
-        "total_ganado": 0.0
-    }
-
     for year, wb in wbs.items():
         sheet = wb.active
         
@@ -141,25 +133,10 @@ if all(wb is not None for wb in wbs.values()):
         tea_calc = ((1.0 + (tna_dec / 12.0)) ** 12.0) - 1.0
 
         d2_raw = sheet["D2"].value # Total Interés Ganados
-        d3_raw = sheet["D3"].value # Total Depósitos Mensuales
-        d4_raw = sheet["D4"].value # Total Depósitos Personales
-        d5_raw = sheet["D5"].value # Total Depositado sin intereses
         d6_raw = sheet["D6"].value # Total Ganado Incluido Intereses
-
         d2_num = float(d2_raw) if isinstance(d2_raw, (int, float)) else 0.0
-        d3_num = float(d3_raw) if isinstance(d3_raw, (int, float)) else 0.0
-        d4_num = float(d4_raw) if isinstance(d4_raw, (int, float)) else 0.0
-        d5_num = float(d5_raw) if isinstance(d5_raw, (int, float)) else 0.0
         d6_num = float(d6_raw) if isinstance(d6_raw, (int, float)) else 0.0
-
         ratio_ganancia_calc = (d2_num / d6_num) if d6_num > 0 else 0.0
-
-        # Acumular en KPI de Totales Consolidados de 3 Años
-        totales_consolidados["int_ganados"] += d2_num
-        totales_consolidados["dep_mensuales"] += d3_num
-        totales_consolidados["dep_personales"] += d4_num
-        totales_consolidados["dep_sin_int"] += d5_num
-        totales_consolidados["total_ganado"] += d6_num
 
         datos[year] = {
             # Sección 1: Condiciones
@@ -171,9 +148,9 @@ if all(wb is not None for wb in wbs.values()):
             
             # Sección 2: Resultados
             "int_ganados": fmt_moneda(d2_raw),
-            "dep_mensuales": fmt_moneda(d3_raw),
-            "dep_personales": fmt_moneda(d4_raw),
-            "dep_sin_int": fmt_moneda(d5_raw),
+            "dep_mensuales": fmt_moneda(sheet["D3"].value),
+            "dep_personales": fmt_moneda(sheet["D4"].value),
+            "dep_sin_int": fmt_moneda(sheet["D5"].value),
             "total_ganado": fmt_moneda(d6_raw),
             
             # Sección 3: Rendimientos
@@ -186,71 +163,6 @@ if all(wb is not None for wb in wbs.values()):
             "aportes_prom": fmt_moneda(sheet["D19"].value),
             "int_diario_prom": fmt_moneda(sheet["B19"].value)
         }
-
-    # ==============================================================================
-    # KPI DE TOTALES CONSOLIDADOS DE LOS 3 AÑOS (2024 + 2025 + 2026)
-    # ==============================================================================
-    st.subheader("🌐 Totales Consolidados (2024 + 2025 + 2026)")
-    
-    roi_global = (totales_consolidados["int_ganados"] / totales_consolidados["dep_sin_int"]) if totales_consolidados["dep_sin_int"] > 0 else 0.0
-
-    css_kpis = """<style>
-.kpi-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-top: 8px;
-    margin-bottom: 20px;
-}
-.kpi-card {
-    background-color: #ffffff;
-    border: 1px solid #000000;
-    border-radius: 6px;
-    padding: 8px 10px;
-    flex: 1 1 140px;
-    min-width: 125px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-    text-align: center;
-    font-family: Calibri, 'Segoe UI', Arial, sans-serif;
-}
-.kpi-card-yellow { border-top: 4px solid #FFE600; background-color: #FFFFF0; }
-.kpi-card-green { border-top: 4px solid #22C55E; background-color: #F0FDF4; }
-.kpi-card-blue { border-top: 4px solid #3B82F6; background-color: #EFF6FF; }
-.kpi-card-purple { border-top: 4px solid #8B5CF6; background-color: #F5F3FF; }
-.kpi-label { font-size: 11px; font-weight: bold; color: #374151; text-transform: uppercase; line-height: 1.2; margin-bottom: 4px; }
-.kpi-value { font-size: 16px; font-weight: bold; color: #000000; }
-</style>"""
-
-    html_kpi_consolidados = f"""{css_kpis}
-<div class="kpi-grid">
-<div class="kpi-card kpi-card-green">
-<div class="kpi-label">Gran Total Interés Ganado</div>
-<div class="kpi-value">{fmt_moneda(totales_consolidados["int_ganados"])}</div>
-</div>
-<div class="kpi-card kpi-card-blue">
-<div class="kpi-label">Gran Total Dep. Mensuales</div>
-<div class="kpi-value">{fmt_moneda(totales_consolidados["dep_mensuales"])}</div>
-</div>
-<div class="kpi-card kpi-card-yellow">
-<div class="kpi-label">Gran Total Dep. Personales</div>
-<div class="kpi-value">{fmt_moneda(totales_consolidados["dep_personales"])}</div>
-</div>
-<div class="kpi-card kpi-card-blue">
-<div class="kpi-label">Gran Total Depositado (sin Int.)</div>
-<div class="kpi-value">{fmt_moneda(totales_consolidados["dep_sin_int"])}</div>
-</div>
-<div class="kpi-card kpi-card-green">
-<div class="kpi-label">Gran Total Ganado (con Int.)</div>
-<div class="kpi-value">{fmt_moneda(totales_consolidados["total_ganado"])}</div>
-</div>
-<div class="kpi-card kpi-card-purple">
-<div class="kpi-label">ROI Global Acumulado</div>
-<div class="kpi-value">{fmt_porcentaje(roi_global)}</div>
-</div>
-</div>"""
-
-    st.markdown(html_kpi_consolidados, unsafe_allow_html=True)
-    st.divider()
 
     # ==============================================================================
     # ESTILOS CSS REUTILIZABLES COMPACTOS Y ADAPTATIVOS A MÓVIL
@@ -532,7 +444,7 @@ if all(wb is not None for wb in wbs.values()):
     st.markdown(html_rendimientos, unsafe_allow_html=True)
 
     # ==============================================================================
-    # 4. GRÁFICOS DINÁMICOS (CON OPTIMIZACIÓN DE LECTURA MASIVA iter_rows)
+    # 4. GRÁFICOS DINÁMICOS
     # ==============================================================================
     st.divider()
     st.subheader("📊 Análisis Gráfico de Ahorros")
@@ -549,34 +461,37 @@ if all(wb is not None for wb in wbs.values()):
         valores_ad = []
         valores_ag = []
         
-        # Lectura en bloque optimizada en lugar de acceder celda por celda en bucle
-        filas_matriz = list(sheet.iter_rows(values_only=True))
-
-        for row in filas_matriz:
-            val_bf = row[57] if len(row) > 57 else None  # Col BF (índice 57)
-            val_ad = row[29] if len(row) > 29 else None  # Col AD (índice 29)
-            val_ag = row[32] if len(row) > 32 else None  # Col AG (índice 32)
-
-            if val_bf is not None and isinstance(val_bf, (int, float)) and not isinstance(val_bf, bool):
+        # Recorremos las filas desde la 1 hasta el final para BF, AD y AG
+        for r in range(1, sheet.max_row + 1):
+            val_bf = sheet[f"BF{r}"].value
+            val_ad = sheet[f"AD{r}"].value
+            val_ag = sheet[f"AG{r}"].value
+            
+            # Extraemos los valores numéricos válidos de la columna BF (Interés Mensual)
+            if val_bf is not None and type(val_bf) in (int, float) and not isinstance(val_bf, bool):
                 valores_bf.append(float(val_bf))
-
-            if val_ad is not None and isinstance(val_ad, (int, float)) and not isinstance(val_ad, bool):
+                
+            # Extraemos los valores numéricos válidos de la columna AD (Saldo Fin de Mes)
+            if val_ad is not None and type(val_ad) in (int, float) and not isinstance(val_ad, bool):
                 valores_ad.append(float(val_ad))
 
-            if val_ag is not None and isinstance(val_ag, (int, float)) and not isinstance(val_ag, bool):
+            # Extraemos los valores numéricos válidos de la columna AG (Interés Ganado Mensual para Acumular)
+            if val_ag is not None and type(val_ag) in (int, float) and not isinstance(val_ag, bool):
                 valores_ag.append(float(val_ag))
                 
         datos_int_mensual[year] = valores_bf
         datos_saldo_fin_mes[year] = valores_ad
+        
+        # Cálculo del Interés Acumulado Creciente (Suma acumulativa de la columna AG)
         datos_int_acumulado[year] = list(np.cumsum(valores_ag)) if valores_ag else []
 
-        # Extracción y cálculo del Interés Diario Promedio por mes (Lectura en bloque optimizada M=12 y R=17)
+        # Extracción y cálculo del Interés Diario Promedio por mes desde Columna M (fechas) y Columna R (interés diario)
         rows_diario = []
-        for row in filas_matriz:
-            val_m = row[12] if len(row) > 12 else None  # Col M (índice 12)
-            val_r = row[17] if len(row) > 17 else None  # Col R (índice 17)
-
-            if val_r is not None and isinstance(val_r, (int, float)) and not isinstance(val_r, bool):
+        for r in range(1, sheet.max_row + 1):
+            val_m = sheet[f"M{r}"].value
+            val_r = sheet[f"R{r}"].value
+            
+            if val_r is not None and type(val_r) in (int, float) and not isinstance(val_r, bool):
                 date_key = None
                 if hasattr(val_m, 'year') and hasattr(val_m, 'month'):
                     date_key = (val_m.year, val_m.month)
@@ -622,6 +537,7 @@ if all(wb is not None for wb in wbs.values()):
     with tab_mensual:
         st.markdown("<h5 style='text-align: center; color: #00D1B2; margin-bottom: 0;'>Interés Ganado Mensual (Columna BF)</h5>", unsafe_allow_html=True)
         
+        # Determinar el número máximo de meses entre los tres ahorros
         max_meses = max([len(v) for v in datos_int_mensual.values()] + [0])
         
         if max_meses > 0:
@@ -641,9 +557,9 @@ if all(wb is not None for wb in wbs.values()):
                     orientation='h',
                     marker_color=colores_anios[year],
                     text=text_vals,
-                    textangle=0,
-                    textposition='auto',
-                    insidetextanchor='end'
+                    textangle=0,            # Texto siempre horizontal
+                    textposition='auto',    # Adentro si cabe, afuera a la derecha si es barra corta
+                    insidetextanchor='end'  # Pegado al extremo derecho si está adentro
                 ))
 
             fig_m.update_layout(
@@ -651,7 +567,7 @@ if all(wb is not None for wb in wbs.values()):
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                height=max(350, max_meses * 70),
+                height=max(350, max_meses * 70), # Altura dinámica según cantidad de meses
                 margin=dict(l=10, r=80, t=10, b=10),
                 dragmode=False,
                 legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="center", x=0.5)
@@ -685,9 +601,9 @@ if all(wb is not None for wb in wbs.values()):
                     orientation='h',
                     marker_color=colores_anios[year],
                     text=text_vals_s,
-                    textangle=0,
-                    textposition='auto',
-                    insidetextanchor='end'
+                    textangle=0,            # Texto siempre horizontal
+                    textposition='auto',    # Adentro si cabe, afuera a la derecha si es barra corta
+                    insidetextanchor='end'  # Pegado al extremo derecho si está adentro
                 ))
 
             fig_s.update_layout(
@@ -729,9 +645,9 @@ if all(wb is not None for wb in wbs.values()):
                     orientation='h',
                     marker_color=colores_anios[year],
                     text=text_vals_d,
-                    textangle=0,
-                    textposition='auto',
-                    insidetextanchor='end'
+                    textangle=0,            # Texto siempre horizontal
+                    textposition='auto',    # Adentro si cabe, afuera a la derecha si es barra corta
+                    insidetextanchor='end'  # Pegado al extremo derecho si está adentro
                 ))
 
             fig_d.update_layout(
@@ -773,9 +689,9 @@ if all(wb is not None for wb in wbs.values()):
                     orientation='h',
                     marker_color=colores_anios[year],
                     text=text_vals_a,
-                    textangle=0,
-                    textposition='auto',
-                    insidetextanchor='end'
+                    textangle=0,            # Texto siempre horizontal
+                    textposition='auto',    # Adentro si cabe, afuera a la derecha si es barra corta
+                    insidetextanchor='end'  # Pegado al extremo derecho si está adentro
                 ))
 
             fig_a.update_layout(
