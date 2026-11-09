@@ -152,12 +152,49 @@ if all(wb is not None for wb in wbs.values()):
         tea_calc = ((1.0 + (tna_dec / 12.0)) ** 12.0) - 1.0
 
         d2_raw = sheet["D2"].value # Total Interés Ganados
+        d5_raw = sheet["D5"].value # Total Depositado sin intereses
         d6_raw = sheet["D6"].value # Total Ganado Incluido Intereses
         d2_num = float(d2_raw) if isinstance(d2_raw, (int, float)) else 0.0
+        d5_num = float(d5_raw) if isinstance(d5_raw, (int, float)) else 0.0
         d6_num = float(d6_raw) if isinstance(d6_raw, (int, float)) else 0.0
         ratio_ganancia_calc = (d2_num / d6_num) if d6_num > 0 else 0.0
 
         total_int_ganados_acum += d2_num
+
+        # CÁLCULOS DE KPIS ADICIONALES
+        # 1. Interés sobre Interés (Ganancia por Interés Compuesto)
+        chart_intereses_kpi = []
+        r_kpi = 2
+        while True:
+            f_cobro_k = sheet.cell(row=r_kpi, column=29).value  # Col AC
+            int_m_k = sheet.cell(row=r_kpi, column=33).value     # Col AG
+            if f_cobro_k is None or str(f_cobro_k).strip() == "":
+                break
+            chart_intereses_kpi.append(float(int_m_k) if isinstance(int_m_k, (int, float)) else 0.0)
+            r_kpi += 1
+
+        interes_compuesto_calc = 0.0
+        cum_int_temp = 0.0
+        tna_mensual = tna_dec / 12.0
+        for int_m_val in chart_intereses_kpi:
+            interes_compuesto_calc += cum_int_temp * tna_mensual
+            cum_int_temp += int_m_val
+
+        # 2. Retorno por cada $100 (ROI)
+        d7_raw = sheet["D7"].value
+        d7_num = float(d7_raw) if isinstance(d7_raw, (int, float)) else (d2_num / d5_num if d5_num > 0 else 0.0)
+        d7_pct = d7_num * 100.0 if d7_num <= 1.0 else d7_num
+        retorno_100_val = f"${d7_pct:.2f}".replace(".", ",")
+
+        # 3. Ganancia por $100 del Fondo (Ratio)
+        ratio_100_val = f"${ratio_ganancia_calc * 100.0:.2f}".replace(".", ",")
+
+        # 4. Productividad por cada $1.000 Depositados
+        b19_raw = sheet["B19"].value
+        d16_raw = sheet["D16"].value
+        b19_num = float(b19_raw) if isinstance(b19_raw, (int, float)) else 0.0
+        d16_num = float(d16_raw) if isinstance(d16_raw, (int, float)) else 0.0
+        prod_diaria_1000 = (b19_num / (d16_num / 1000.0)) if d16_num > 0 else (tna_dec / 360.0) * 1000.0
 
         f_ini_raw = obtener_valor(sheet, "F3", "H3")
         f_fin_raw = obtener_valor(sheet, "F5", "H5")
@@ -192,6 +229,10 @@ if all(wb is not None for wb in wbs.values()):
             "tea": fmt_porcentaje(tea_calc),
             "roi": fmt_porcentaje(sheet["D7"].value),
             "ratio_ganancia": fmt_porcentaje(ratio_ganancia_calc),
+            "interes_sobre_interes": fmt_moneda(interes_compuesto_calc),
+            "retorno_100": retorno_100_val,
+            "ganancia_100": ratio_100_val,
+            "prod_1000": f"{fmt_moneda(prod_diaria_1000)} / día",
             "int_mensual_pond": fmt_moneda(sheet["D13"].value),
             "saldo_prom_pond": fmt_moneda(sheet["D16"].value),
             "aportes_prom": fmt_moneda(sheet["D19"].value),
@@ -490,6 +531,30 @@ if all(wb is not None for wb in wbs.values()):
 <td class="val-purple">{datos["2024"]["ratio_ganancia"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2024"]["int_ganados"]} / {datos["2024"]["total_ganado"]})</span></td>
 <td class="val-purple">{datos["2025"]["ratio_ganancia"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2025"]["int_ganados"]} / {datos["2025"]["total_ganado"]})</span></td>
 <td class="val-purple">{datos["2026"]["ratio_ganancia"]}<br><span style="font-weight: normal; font-size: 9px; color: #374151;">({datos["2026"]["int_ganados"]} / {datos["2026"]["total_ganado"]})</span></td>
+</tr>
+<tr>
+<td class="lbl-yellow">Interés sobre Interés<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Ganancia por Int. Compuesto)</span></td>
+<td class="val-green">{datos["2024"]["interes_sobre_interes"]}</td>
+<td class="val-green">{datos["2025"]["interes_sobre_interes"]}</td>
+<td class="val-green">{datos["2026"]["interes_sobre_interes"]}</td>
+</tr>
+<tr>
+<td class="lbl-yellow">Retorno por cada $100 (ROI)<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Ganado por $100 de bolsillo)</span></td>
+<td class="val-blue">{datos["2024"]["retorno_100"]}</td>
+<td class="val-blue">{datos["2025"]["retorno_100"]}</td>
+<td class="val-blue">{datos["2026"]["retorno_100"]}</td>
+</tr>
+<tr>
+<td class="lbl-yellow">Ganancia por $100 del Fondo (Ratio)<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Ganancia limpia por $100 rescatados)</span></td>
+<td class="val-purple">{datos["2024"]["ganancia_100"]}</td>
+<td class="val-purple">{datos["2025"]["ganancia_100"]}</td>
+<td class="val-purple">{datos["2026"]["ganancia_100"]}</td>
+</tr>
+<tr>
+<td class="lbl-yellow">Productividad por $1.000<br><span style="font-weight: normal; font-size: 9px; color: #1F2937;">(Int. Diario por $1.000 guardados)</span></td>
+<td class="val-tan">{datos["2024"]["prod_1000"]}</td>
+<td class="val-tan">{datos["2025"]["prod_1000"]}</td>
+<td class="val-tan">{datos["2026"]["prod_1000"]}</td>
 </tr>
 <tr>
 <td class="lbl-yellow">Interés Mensual Ponderado</td>
