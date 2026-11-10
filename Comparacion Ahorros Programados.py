@@ -8,6 +8,11 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
 # ==============================================================================
 # AUTORUNNER: FUNCIONA TANTO LOCALMENTE COMO EN STREAMLIT CLOUD
 # ==============================================================================
@@ -49,6 +54,120 @@ def cargar_excel_drive(file_id):
     excel_bytes = io.BytesIO(response.content)
     wb = openpyxl.load_workbook(excel_bytes, data_only=True)
     return wb
+
+# ==============================================================================
+# FUNCIÓN GENERADORA DE PDF CACHEADA (OPTIMIZA VELOCIDAD DE CARGA)
+# ==============================================================================
+@st.cache_data(ttl=600)
+def generar_pdf_reporte_cached(datos_condiciones, datos_resultados, datos_rendimientos, total_int_ganados_acum, total_anios, ganancia_mensual_prom):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=30,
+        leftMargin=30,
+        topMargin=30,
+        bottomMargin=30
+    )
+    story = []
+    styles = getSampleStyleSheet()
+
+    style_title = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=15, leading=17, textColor=colors.HexColor('#1F2937'), spaceAfter=3)
+    style_sub = ParagraphStyle('DocSub', parent=styles['Normal'], fontSize=8.5, leading=10, textColor=colors.HexColor('#4B5563'), spaceAfter=8)
+    style_h2 = ParagraphStyle('DocH2', parent=styles['Heading2'], fontSize=10.5, leading=12, textColor=colors.HexColor('#1E3A8A'), spaceBefore=6, spaceAfter=3)
+    style_cell = ParagraphStyle('DocCell', parent=styles['Normal'], fontSize=7.5, leading=9, textColor=colors.HexColor('#000000'), alignment=1)
+    style_cell_left = ParagraphStyle('DocCellLeft', parent=style_cell, alignment=0)
+    style_cell_bold = ParagraphStyle('DocCellBold', parent=style_cell, fontName='Helvetica-Bold')
+    style_cell_header = ParagraphStyle('DocCellHeader', parent=style_cell, fontName='Helvetica-Bold', textColor=colors.white, alignment=1)
+
+    fecha_hoy = datetime.date.today().strftime('%d/%m/%Y')
+    story.append(Paragraph("💰 Comparación Ahorros Programados", style_title))
+    story.append(Paragraph(f"Reporte Consolidado de Rendimientos e Inversiones (2024 - 2026) | Fecha: {fecha_hoy}", style_sub))
+
+    # RESUMEN EJECUTIVO (KPIS)
+    story.append(Paragraph("📌 Resumen Consolidado General", style_h2))
+    kpi_data = [
+        [Paragraph("Métrica", style_cell_header), Paragraph("Valor Acumulado", style_cell_header)],
+        [Paragraph("Total Interés Ganados", style_cell_left), Paragraph(f"${total_int_ganados_acum:,.2f}".replace(".", "X").replace(",", ".").replace("X", ","), style_cell_bold)],
+        [Paragraph("Tiempo Total Acumulado", style_cell_left), Paragraph(f"{total_anios:.1f}".replace(".", ",") + " años", style_cell)],
+        [Paragraph("Ganancia Promedio por Mes", style_cell_left), Paragraph(f"${ganancia_mensual_prom:,.2f}".replace(".", "X").replace(",", ".").replace("X", ","), style_cell_bold)],
+    ]
+    t_kpi = Table(kpi_data, colWidths=[300, 252])
+    t_kpi.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F2937')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+    ]))
+    story.append(t_kpi)
+    story.append(Spacer(1, 6))
+
+    # 1. CONDICIONES DEL AHORRO
+    story.append(Paragraph("📋 1. Condiciones del Ahorro Programado", style_h2))
+    t_cond_data = [[Paragraph("Condiciones", style_cell_header), Paragraph("2024", style_cell_header), Paragraph("2025", style_cell_header), Paragraph("2026", style_cell_header)]]
+    for row in datos_condiciones:
+        t_cond_data.append([
+            Paragraph(str(row[0]), style_cell_left),
+            Paragraph(str(row[1]), style_cell),
+            Paragraph(str(row[2]), style_cell),
+            Paragraph(str(row[3]), style_cell)
+        ])
+    t_cond = Table(t_cond_data, colWidths=[212, 113, 113, 114])
+    t_cond.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1F2937')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+    ]))
+    story.append(t_cond)
+    story.append(Spacer(1, 6))
+
+    # 2. RESULTADOS
+    story.append(Paragraph("📊 2. Resultados", style_h2))
+    t_res_data = [[Paragraph("Resultados", style_cell_header), Paragraph("2024", style_cell_header), Paragraph("2025", style_cell_header), Paragraph("2026", style_cell_header)]]
+    for row in datos_resultados:
+        t_res_data.append([
+            Paragraph(str(row[0]), style_cell_left),
+            Paragraph(str(row[1]), style_cell_bold if "Ganad" in str(row[0]) else style_cell),
+            Paragraph(str(row[2]), style_cell_bold if "Ganad" in str(row[0]) else style_cell),
+            Paragraph(str(row[3]), style_cell_bold if "Ganad" in str(row[0]) else style_cell)
+        ])
+    t_res = Table(t_res_data, colWidths=[212, 113, 113, 114])
+    t_res.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#059669')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+    ]))
+    story.append(t_res)
+    story.append(Spacer(1, 6))
+
+    # 3. RENDIMIENTOS
+    story.append(Paragraph("📈 3. Rendimientos", style_h2))
+    t_rend_data = [[Paragraph("Rendimientos", style_cell_header), Paragraph("2024", style_cell_header), Paragraph("2025", style_cell_header), Paragraph("2026", style_cell_header)]]
+    for row in datos_rendimientos:
+        t_rend_data.append([
+            Paragraph(str(row[0]), style_cell_left),
+            Paragraph(str(row[1]), style_cell),
+            Paragraph(str(row[2]), style_cell),
+            Paragraph(str(row[3]), style_cell)
+        ])
+    t_rend = Table(t_rend_data, colWidths=[212, 113, 113, 114])
+    t_rend.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E3A8A')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#000000')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 2.5),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2.5),
+    ]))
+    story.append(t_rend)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 def obtener_valor(sheet, celda_principal, celda_secundaria=None):
     val = sheet[celda_principal].value
@@ -116,14 +235,14 @@ def str_to_float(val_str):
     except: return 0.0
 
 # ==============================================================================
-# ENCABEZADO PRINCIPAL Y BOTÓN RECARGAR
+# ENCABEZADO PRINCIPAL Y BOTONES RECARGAR / PDF
 # ==============================================================================
-col_title, col_btn = st.columns([4, 1])
+col_title, col_btn1, col_btn2 = st.columns([3, 1, 1])
 with col_title:
     st.title("💰 Comparación Ahorros Programados")
     st.caption("Sincronizado en tiempo real desde Google Drive")
 
-with col_btn:
+with col_btn1:
     if st.button("🔄 Recargar", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
@@ -242,6 +361,56 @@ if all(wb is not None for wb in wbs.values()):
     total_anios = total_dias_acum / 365.25 if total_dias_acum > 0 else 0.0
     total_meses = total_anios * 12.0
     ganancia_mensual_prom = (total_int_ganados_acum / total_meses) if total_meses > 0 else 0.0
+
+    # GENERACIÓN DE PDF CACHEADA
+    datos_pdf_condiciones = (
+        ("Tasa Nominal Anual", datos["2024"]["tna"], datos["2025"]["tna"], datos["2026"]["tna"]),
+        ("Fecha inicio", datos["2024"]["fecha_ini"], datos["2025"]["fecha_ini"], datos["2026"]["fecha_ini"]),
+        ("Fecha Fin", datos["2024"]["fecha_fin"], datos["2025"]["fecha_fin"], datos["2026"]["fecha_fin"]),
+        ("Total de Días", datos["2024"]["total_dias"], datos["2025"]["total_dias"], datos["2026"]["total_dias"]),
+        ("Valor Aporte Mensual", datos["2024"]["aporte_mensual"], datos["2025"]["aporte_mensual"], datos["2026"]["aporte_mensual"]),
+    )
+
+    datos_pdf_resultados = (
+        ("Total Interés Ganados", datos["2024"]["int_ganados"], datos["2025"]["int_ganados"], datos["2026"]["int_ganados"]),
+        ("Total Depósitos Mensuales", datos["2024"]["dep_mensuales"], datos["2025"]["dep_mensuales"], datos["2026"]["dep_mensuales"]),
+        ("Total Depósitos Personales", datos["2024"]["dep_personales"], datos["2025"]["dep_personales"], datos["2026"]["dep_personales"]),
+        ("Total Depositado sin Intereses", datos["2024"]["dep_sin_int"], datos["2025"]["dep_sin_int"], datos["2026"]["dep_sin_int"]),
+        ("Total Ganado Incluido Intereses", datos["2024"]["total_ganado"], datos["2025"]["total_ganado"], datos["2026"]["total_ganado"]),
+    )
+
+    datos_pdf_rendimientos = (
+        ("TIR (Tasa Interna de Retorno)", datos["2024"]["tir"], datos["2025"]["tir"], datos["2026"]["tir"]),
+        ("TEA (Tasa Efectiva Anual)", datos["2024"]["tea"], datos["2025"]["tea"], datos["2026"]["tea"]),
+        ("ROI (Rentabilidad Acumulada)", datos["2024"]["roi"], datos["2025"]["roi"], datos["2026"]["roi"]),
+        ("Ratio de Ganancia", datos["2024"]["ratio_ganancia"], datos["2025"]["ratio_ganancia"], datos["2026"]["ratio_ganancia"]),
+        ("Interés sobre Interés", datos["2024"]["interes_sobre_interes"], datos["2025"]["interes_sobre_interes"], datos["2026"]["interes_sobre_interes"]),
+        ("Retorno por cada $100 (ROI)", datos["2024"]["retorno_100"], datos["2025"]["retorno_100"], datos["2026"]["retorno_100"]),
+        ("Ganancia por $100 del Fondo", datos["2024"]["ganancia_100"], datos["2025"]["ganancia_100"], datos["2026"]["ganancia_100"]),
+        ("Productividad por $1.000", datos["2024"]["prod_1000"], datos["2025"]["prod_1000"], datos["2026"]["prod_1000"]),
+        ("Interés Mensual Ponderado", datos["2024"]["int_mensual_pond"], datos["2025"]["int_mensual_pond"], datos["2026"]["int_mensual_pond"]),
+        ("Saldo Fin de Mes Ponderado", datos["2024"]["saldo_prom_pond"], datos["2025"]["saldo_prom_pond"], datos["2026"]["saldo_prom_pond"]),
+        ("Aportes Personales Promedio", datos["2024"]["aportes_prom"], datos["2025"]["aportes_prom"], datos["2026"]["aportes_prom"]),
+        ("Interés Diario Promedio", datos["2024"]["int_diario_prom"], datos["2025"]["int_diario_prom"], datos["2026"]["int_diario_prom"]),
+    )
+
+    pdf_bytes = generar_pdf_reporte_cached(
+        datos_pdf_condiciones,
+        datos_pdf_resultados,
+        datos_pdf_rendimientos,
+        total_int_ganados_acum,
+        total_anios,
+        ganancia_mensual_prom
+    )
+
+    with col_btn2:
+        st.download_button(
+            label="📄 Exportar a PDF",
+            data=pdf_bytes,
+            file_name="Comp. Progrmados.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
     # ==============================================================================
     # ESTILOS CSS REUTILIZABLES COMPACTOS Y ADAPTATIVOS A MÓVIL
